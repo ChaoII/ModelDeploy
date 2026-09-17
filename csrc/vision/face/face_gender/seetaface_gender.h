@@ -35,6 +35,15 @@ namespace modeldeploy::vision::face {
          */
         virtual bool predict(const ImageData& image, int* age, TimerArray* timers = nullptr);
 
+        /** \brief 预测性别概率（新增，附属于既有接口；下标 0=女、1=男，和为 1）
+         *
+         * \param[in] image 输入人脸图（建议为对齐/裁剪后的人脸）
+         * \param[out] probs 长度为 2 的概率向量
+         * \return true 成功
+         */
+        virtual bool predict_probs(const ImageData& image, std::vector<float>* probs,
+                                   TimerArray* timers = nullptr);
+
         /** \brief Predict the detection results for a batch of input images
          *
          * \param[in] images The input image list, each element comes from cv::imread()

@@ -1,6 +1,7 @@
 #include "event_bus.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <ctime>
 #include <random>
@@ -73,6 +74,8 @@ nlohmann::json DetectionEvent::to_json() const {
             for (const auto& k : d.keypoints) kps.push_back(nlohmann::json::array({k[0], k[1], k[2]}));
             dj["keypoints"] = std::move(kps);
         }
+        // 深度（depth 模型）：仅在模型激活并产出有效距离时写入（增量字段，旧事件无此键）
+        if (d.has_depth && std::isfinite(d.depth)) dj["depth"] = d.depth;
         objects.push_back(std::move(dj));
     }
     j["objects"] = std::move(objects);
@@ -140,6 +143,11 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
                         k[2].is_number())
                         out.push_back({k[0].get<float>(), k[1].get<float>(), k[2].get<float>()});
                 }
+            }
+            // 深度（depth 模型，米；仅数值才恢复）
+            if (objs[i].contains("depth") && objs[i]["depth"].is_number()) {
+                e.detections[i].depth = objs[i]["depth"].get<float>();
+                e.detections[i].has_depth = true;
             }
         }
     }
@@ -234,6 +242,11 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
                         k[2],
                     });
                 }
+            }
+            // 深度（depth 模型）透传：仅有效值才标记（非有限值丢弃，避免污染事件契约）
+            if (b.has_depth && std::isfinite(b.depth)) {
+                ed.has_depth = true;
+                ed.depth = b.depth;
             }
             if (st.meta.roi_polygon.size() >= 3 &&
                 !aistation::point_in_polygon(ed.x + ed.w * 0.5f, ed.y + ed.h * 0.5f, st.meta.roi_polygon)) {

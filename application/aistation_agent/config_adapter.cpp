@@ -21,6 +21,19 @@ std::string normalize_model_type(const std::string& type) {
         type == "keypoints" || type == "keypoint_detection" || type == "human_pose" ||
         type == "yolo_pose")
         return "pose";
+    // 人脸属性（场景目录 FACE_ATTR 声明 type="face_attr"；性别/年龄）
+    if (type == "face_attr" || type == "face_attribute" || type == "face_attributes" ||
+        type == "face_attr_pipeline")
+        return "face_attr";
+    // 人脸活体/防伪（场景目录 FACE_ANTISPOOF 声明 type="face_as"）
+    if (type == "face_as" || type == "face_antispoof" || type == "antispoof" ||
+        type == "anti_spoof" || type == "face_liveness" || type == "liveness" ||
+        type == "face_as_pipeline")
+        return "face_as";
+    // 单目深度估计（场景目录 DEPTH_SAFE 声明 type="depth"）
+    if (type == "depth" || type == "depth_estimation" || type == "mono_depth" ||
+        type == "yolo_depth" || type == "distance")
+        return "depth";
     return type;
 }
 
@@ -202,7 +215,32 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         *dst = local;
         return true;
     };
-    if (m.type == "ocr") {
+    // 多键别名解析：按顺序取第一个非空字符串键（解析规则与 resolve_path 一致）。
+    // 云端复合模型的子模型键名可能因编排版本而不同，这里统一收口，避免静默丢模型。
+    auto resolve_first = [&](std::initializer_list<const char*> keys, std::string* dst) -> bool {
+        for (const char* k : keys) {
+            if (mo.contains(k) && mo[k].is_string() && !mo[k].get<std::string>().empty())
+                return resolve_path(k, dst);
+        }
+        return true;
+    };
+    if (m.type == "face_attr") {
+        // 人脸性别/年龄复合模型：det（SCRFD）+ cls（性别）+ rec（年龄）
+        if (!resolve_first({"det_url", "det_path", "url", "path"}, &m.path)) return false;
+        if (!resolve_first({"cls_url", "cls_path", "gender_url", "gender_path"}, &m.cls_path))
+            return false;
+        if (!resolve_first({"rec_url", "rec_path", "age_url", "age_path"}, &m.rec_path))
+            return false;
+    } else if (m.type == "face_as") {
+        // 人脸活体复合模型：det（SCRFD）+ cls（fas_first）+ rec（fas_second，可选）
+        if (!resolve_first({"det_url", "det_path", "url", "path"}, &m.path)) return false;
+        if (!resolve_first({"cls_url", "cls_path", "first_url", "first_path",
+                            "fas_first_url", "fas_first_path"}, &m.cls_path))
+            return false;
+        if (!resolve_first({"rec_url", "rec_path", "second_url", "second_path",
+                            "fas_second_url", "fas_second_path"}, &m.rec_path))
+            return false;
+    } else if (m.type == "ocr") {
         // OCR pipeline：det_url→path、cls_url→cls_path、rec_url→rec_path、dict_url→dict_path
         if (!resolve_path("det_url", &m.path)) return false;
         if (!resolve_path("cls_url", &m.cls_path)) return false;

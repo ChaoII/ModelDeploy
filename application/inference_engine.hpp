@@ -11,6 +11,11 @@
 #include "csrc/vision/iseg/ultralytics_seg.h"
 #include "csrc/vision/pose/ultralytics_pose.h"
 #include "csrc/vision/face/face_det/scrfd.h"
+#include "csrc/vision/face/face_gender/seetaface_gender.h"
+#include "csrc/vision/face/face_age/seetaface_age.h"
+#include "csrc/vision/face/face_as/face_as_first.h"
+#include "csrc/vision/face/face_as/face_as_second.h"
+#include "csrc/vision/depth/ultralytics_depth.h"
 #include "csrc/vision/pipeline/pedestrian_attribute.h"
 #include "csrc/vision/ocr/ppocr.h"
 #include "csrc/vision/lpr/lpr_models.h"
@@ -34,6 +39,9 @@ struct DetectionBox {
     float text_score = 0.f;
     // 关键点（pose）：像素坐标 [x, y, score]（事件侧按帧宽高归一化，见 event_bus.cpp）
     std::vector<std::array<float, 3>> keypoints;
+    // 深度（depth 模型）：估算距离（米）；has_depth=true 才写入事件 objects[].depth
+    bool has_depth = false;
+    float depth = 0.f;
 };
 
 /// 人脸关键点（最多 5 个：左右眼/鼻尖/左右嘴角）
@@ -105,6 +113,16 @@ private:
     std::unique_ptr<modeldeploy::vision::detection::UltralyticsSeg> iseg_model_;
     std::unique_ptr<modeldeploy::vision::detection::UltralyticsPose> pose_model_;
     std::unique_ptr<modeldeploy::vision::face::Scrfd> face_model_;
+    // face_attr：SCRFD 人脸检测 + 性别/年龄属性（输出概率分数）
+    std::unique_ptr<modeldeploy::vision::face::Scrfd> fa_det_model_;
+    std::unique_ptr<modeldeploy::vision::face::SeetaFaceGender> fa_gender_model_;
+    std::unique_ptr<modeldeploy::vision::face::SeetaFaceAge> fa_age_model_;
+    // face_as：SCRFD 人脸检测 + fas_first 活体分数（fas_second 可选）
+    std::unique_ptr<modeldeploy::vision::face::Scrfd> fas_det_model_;
+    std::unique_ptr<modeldeploy::vision::face::SeetaFaceAsFirst> fas_first_model_;
+    std::unique_ptr<modeldeploy::vision::face::SeetaFaceAsSecond> fas_second_model_;
+    // depth：单目深度估计（输出整帧最近距离）
+    std::unique_ptr<modeldeploy::vision::detection::UltralyticsDepth> depth_model_;
     std::unique_ptr<modeldeploy::vision::pipeline::PedestrianAttribute> pa_model_;
     std::unique_ptr<modeldeploy::vision::ocr::PaddleOCR> ocr_model_;
     std::unique_ptr<modeldeploy::vision::lpr::LprPipeline> lpr_model_;
@@ -116,6 +134,9 @@ private:
     bool infer_iseg(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_pose(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_face(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_face_attr(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_face_as(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_depth(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_pedestrian_attribute(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_ocr(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_lpr(const modeldeploy::vision::ImageData& image, InferResult* result);

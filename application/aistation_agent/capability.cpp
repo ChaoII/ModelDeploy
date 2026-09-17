@@ -31,11 +31,14 @@ nlohmann::json detect_capabilities(int max_channels) {
     platform = "nvidia";
 #endif
 
-    // 模型族上报须与实际接线一致：obb/iseg/pose 已接入推理与事件（见 pipeline/inference_engine），
-    // 名称与云端场景目录 catalog.py 的声明（type="obb"/"iseg"/"pose"，
-    // model_families=["obb"]/["iseg"]/["pose"]）对齐；pose 事件携带归一化关键点（objects[].keypoints）。
+    // 模型族上报须与实际接线一致：obb/iseg/pose/face_attr/face_as/depth 已接入推理与事件
+    // （见 pipeline/inference_engine），名称与云端场景目录 catalog.py 的声明对齐：
+    // type="obb"/"iseg"/"pose"/"face_attr"/"face_as"/"depth"。
+    // face_attr → 人脸框 attributes{gender_male, age_young}；face_as → attributes{liveness}；
+    // depth → objects[].depth（米）。
     json families = json::array({"det", "cls", "face", "pedestrian_attribute", "ocr", "lpr",
-                                 "tracking", "obb", "iseg", "pose"});
+                                 "tracking", "obb", "iseg", "pose", "face_attr", "face_as",
+                                 "depth"});
 
     json decode = json::array({"h264", "h265"});
     json encode = json::array({"h264"});

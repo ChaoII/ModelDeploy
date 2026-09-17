@@ -3,10 +3,12 @@
 #include "csrc/runtime/runtime_option.h"
 #include "csrc/vision/common/result.h"
 #include "csrc/vision/common/struct.h"
+#include "csrc/vision/utils.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <filesystem>
+#include <limits>
 
 using namespace modeldeploy;
 using namespace modeldeploy::vision;
@@ -29,6 +31,39 @@ void rotated_rect_bounds(const RotatedRect& rr, float* xmin, float* ymin,
         y0 = std::min(y0, py); y1 = std::max(y1, py);
     }
     *xmin = x0; *ymin = y0; *xmax = x1; *ymax = y1;
+}
+
+// NV12（host/device）→ packed BGR（CPU）：人脸属性/活体等 CPU 融合预处只支持 BGR，
+// 直接按单通道读 NV12 会越界（与 classification/scrfd 的同类崩溃修复一致）。
+ImageData to_packed_bgr(const ImageData& image) {
+    if (image.empty() || image.type() != MdImageType::NV12 || image.plane_count() < 2) return image;
+    if (image.device() != Device::CPU) {
+        ImageData cpu;
+        if (!image.toCpu(&cpu)) return {};
+        return ImageData::cvt_color(cpu, ColorConvertType::CVT_NV122PKG_BGR);
+    }
+    return ImageData::cvt_color(image, ColorConvertType::CVT_NV122PKG_BGR);
+}
+
+// face_attr 的“年龄年轻”分数：年龄分布中下标 <= 35 的概率质量 P(age<=35)（模型已 softmax）。
+constexpr int kAgeYoungMax = 35;
+
+float age_young_score(const std::vector<float>& dist) {
+    float s = 0.f;
+    for (size_t i = 0; i < dist.size() && i <= static_cast<size_t>(kAgeYoungMax); ++i) s += dist[i];
+    return std::clamp(s, 0.f, 1.f);
+}
+
+// 深度图最近有效距离（米）：忽略非有限/非正值，取最小值；全无效返回 false（fail-closed）。
+bool nearest_depth(const std::vector<float>& depth, float* out) {
+    float best = std::numeric_limits<float>::infinity();
+    for (float v : depth) {
+        if (!std::isfinite(v) || v <= 0.f) continue;
+        if (v < best) best = v;
+    }
+    if (!std::isfinite(best) || !out) return false;
+    *out = best;
+    return true;
 }
 }  // namespace
 
@@ -94,6 +129,60 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             }
             if (cfg_.input_size.size() == 2)
                 pose_model_->get_preprocessor().set_size(cfg_.input_size);
+        } else if (cfg.type == "face_attr") {
+            // 人脸性别/年龄属性（SCRFD 检测 + 性别/年龄分类，输出概率分数）
+            // 路径口径：path=SCRFD、cls_path=性别、rec_path=年龄（见 config_adapter 归一化）
+            if (cfg.cls_path.empty() || cfg.rec_path.empty()) {
+                std::cerr << "[InferenceEngine] face_attr requires cls_path(gender) and rec_path(age)"
+                          << std::endl;
+                return false;
+            }
+            fa_det_model_ = std::make_unique<face::Scrfd>(cfg.path, opt);
+            fa_gender_model_ = std::make_unique<face::SeetaFaceGender>(cfg.cls_path, opt);
+            fa_age_model_ = std::make_unique<face::SeetaFaceAge>(cfg.rec_path, opt);
+            if (!fa_det_model_->is_initialized() || !fa_gender_model_->is_initialized() ||
+                !fa_age_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] face_attr init failed: " << cfg.path << " | "
+                          << cfg.cls_path << " | " << cfg.rec_path << std::endl;
+                fa_det_model_.reset();
+                fa_gender_model_.reset();
+                fa_age_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                fa_det_model_->get_preprocessor().set_size(cfg_.input_size);
+            fa_det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        } else if (cfg.type == "face_as") {
+            // 人脸活体（SCRFD 检测 + fas_first 活体分数；fas_second 可选，用作整体伪造门控）
+            if (cfg.cls_path.empty()) {
+                std::cerr << "[InferenceEngine] face_as requires cls_path(fas_first)" << std::endl;
+                return false;
+            }
+            fas_det_model_ = std::make_unique<face::Scrfd>(cfg.path, opt);
+            fas_first_model_ = std::make_unique<face::SeetaFaceAsFirst>(cfg.cls_path, opt);
+            if (!cfg.rec_path.empty())
+                fas_second_model_ = std::make_unique<face::SeetaFaceAsSecond>(cfg.rec_path, opt);
+            if (!fas_det_model_->is_initialized() || !fas_first_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] face_as init failed: " << cfg.path << " | "
+                          << cfg.cls_path << std::endl;
+                fas_det_model_.reset();
+                fas_first_model_.reset();
+                fas_second_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                fas_det_model_->get_preprocessor().set_size(cfg_.input_size);
+            fas_det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        } else if (cfg.type == "depth") {
+            // 单目深度估计（yolo26n-depth）：输出整帧最近距离（见 infer_depth）
+            depth_model_ = std::make_unique<detection::UltralyticsDepth>(cfg.path, opt);
+            if (!depth_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] Depth model init failed: " << cfg.path << std::endl;
+                depth_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                depth_model_->get_preprocessor().set_size(cfg_.input_size);
         } else if (cfg.type == "pedestrian_attribute") {
             pa_model_ = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
                 cfg.path, cfg.rec_path, opt);
@@ -240,6 +329,13 @@ void InferenceEngine::unload() {
     iseg_model_.reset();
     pose_model_.reset();
     face_model_.reset();
+    fa_det_model_.reset();
+    fa_gender_model_.reset();
+    fa_age_model_.reset();
+    fas_det_model_.reset();
+    fas_first_model_.reset();
+    fas_second_model_.reset();
+    depth_model_.reset();
     pa_model_.reset();
     ocr_model_.reset();
     lpr_model_.reset();
@@ -264,6 +360,12 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_iseg(image, result);
     if (cfg_.type == "pose")
         return infer_pose(image, result);
+    if (cfg_.type == "face_attr")
+        return infer_face_attr(image, result);
+    if (cfg_.type == "face_as")
+        return infer_face_as(image, result);
+    if (cfg_.type == "depth")
+        return infer_depth(image, result);
     if (cfg_.type == "pedestrian_attribute")
         return infer_pedestrian_attribute(image, result);
     if (cfg_.type == "ocr")
@@ -413,6 +515,117 @@ bool InferenceEngine::infer_face(const ImageData& image, InferResult* result) {
         }
         result->keypoints.push_back(std::move(kps));
     }
+    return true;
+}
+
+bool InferenceEngine::infer_face_attr(const ImageData& image, InferResult* result) {
+    if (!fa_det_model_ || !result) return false;
+    // CPU 融合预处只支持 packed BGR：NV12 帧先转换（同 classification/scrfd 崩溃修复）
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    std::vector<KeyPointsResult> faces;
+    if (!fa_det_model_->predict(frame, &faces)) return false;
+    const float thresh = cfg_.confidence_threshold;
+    // 默认属性名与云端 FACE_ATTR 契约一致（gender_male/age_young）；配置 attributes 可按序覆盖
+    // （复用 pedestrian_attribute 的「下标 → 属性名」机制）。
+    static const std::vector<std::string> kDefaultNames = {"gender_male", "age_young"};
+    const std::vector<std::string>& names =
+        cfg_.attributes.empty() ? kDefaultNames : cfg_.attributes;
+    const float W = static_cast<float>(frame.width());
+    const float H = static_cast<float>(frame.height());
+    for (const auto& f : faces) {
+        if (f.score < thresh) continue;
+        // 人脸区域外扩 10%，给属性模型留出上下文
+        const float mx = f.box.width * 0.1f, my = f.box.height * 0.1f;
+        const float x1 = std::max(0.f, f.box.x - mx), y1 = std::max(0.f, f.box.y - my);
+        const float x2 = std::min(W, f.box.x + f.box.width + mx);
+        const float y2 = std::min(H, f.box.y + f.box.height + my);
+        if (x2 - x1 < 2.f || y2 - y1 < 2.f) continue;
+        ImageData face = frame.crop({x1, y1, x2 - x1, y2 - y1});
+        if (face.empty()) continue;
+        std::vector<float> gender_probs;
+        if (!fa_gender_model_->predict_probs(face, &gender_probs)) continue;
+        std::vector<float> age_dist;
+        const bool got_age = fa_age_model_->predict_dist(face, &age_dist);
+        DetectionBox box;
+        box.x = f.box.x; box.y = f.box.y; box.w = f.box.width; box.h = f.box.height;
+        box.score = f.score; box.label_id = f.label_id;
+        box.label_name = "face";
+        // 性别概率：下标 0=女、1=男（SDK 口径），取男生概率作为 gender_male 分数
+        if (!names.empty())
+            box.attributes.emplace_back(
+                names[0], gender_probs.size() >= 2 ? std::clamp(gender_probs[1], 0.f, 1.f) : 0.f);
+        if (names.size() > 1)
+            box.attributes.emplace_back(names[1], got_age ? age_young_score(age_dist) : 0.f);
+        result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_face_as(const ImageData& image, InferResult* result) {
+    if (!fas_det_model_ || !result) return false;
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    std::vector<KeyPointsResult> faces;
+    if (!fas_det_model_->predict(frame, &faces)) return false;
+    const float thresh = cfg_.confidence_threshold;
+    std::vector<KeyPointsResult> kept;
+    kept.reserve(faces.size());
+    for (const auto& f : faces)
+        if (f.score >= thresh) kept.push_back(f);
+    if (kept.empty()) return true;  // 无人脸：无事件对象（不伪造分数）
+    // 5 点对齐后送入 fas_first 逐脸/批打分（活体分数 ∈ [0,1]）
+    std::vector<ImageData> aligned = utils::align_face_with_five_points(frame, kept);
+    std::vector<float> scores;
+    if (aligned.size() == 1) {
+        scores.assign(1, 0.f);
+        fas_first_model_->predict(aligned[0], &scores[0]);
+    } else if (!aligned.empty()) {
+        fas_first_model_->batch_predict(aligned, &scores);
+    }
+    // fas_second 可选：任一高置信检测（label>=1 且 score>=0.8）→ 整体判为伪造，liveness=0
+    // （对齐 SDK SeetaFaceAsPipeline 的 has_box 语义）
+    bool spoof_global = false;
+    if (fas_second_model_) {
+        std::vector<std::tuple<int, float>> second;
+        if (fas_second_model_->predict(frame, &second)) {
+            for (const auto& [label, score] : second)
+                if (label >= 1 && score >= 0.8f) { spoof_global = true; break; }
+        }
+    }
+    const size_t n = std::min(kept.size(), scores.size());
+    for (size_t i = 0; i < n; ++i) {
+        DetectionBox box;
+        box.x = kept[i].box.x; box.y = kept[i].box.y;
+        box.w = kept[i].box.width; box.h = kept[i].box.height;
+        box.score = kept[i].score; box.label_id = kept[i].label_id;
+        box.label_name = "face";
+        // 契约：attributes["liveness"] = 活体分数（低分=非活体）
+        box.attributes.emplace_back("liveness",
+                                    spoof_global ? 0.f : std::clamp(scores[i], 0.f, 1.f));
+        result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_depth(const ImageData& image, InferResult* result) {
+    if (!depth_model_ || !result) return false;
+    DepthResult d;
+    // UltralyticsDepth::predict 内部支持 NV12/设备帧（零拷贝 NV12 预处路径）
+    if (!depth_model_->predict(image, &d)) return false;
+    float near = 0.f;
+    if (!nearest_depth(d.depth, &near)) return false;  // 全无效深度：不产生对象（fail-closed）
+    const float W = static_cast<float>(image.width());
+    const float H = static_cast<float>(image.height());
+    // 深度模型无实例框：产出整帧对象，depth=帧内最近有效距离（米），供云端 distance 叶子判定
+    DetectionBox box;
+    box.x = 0.f; box.y = 0.f; box.w = W; box.h = H;
+    box.label_id = -1;
+    box.score = 0.f;
+    box.label_name = "depth";
+    box.has_depth = true;
+    box.depth = near;
+    result->boxes.push_back(std::move(box));
     return true;
 }
 

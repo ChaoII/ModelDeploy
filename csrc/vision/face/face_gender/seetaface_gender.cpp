@@ -62,5 +62,34 @@ bool SeetaFaceGender::predict(const ImageData& image, int* age, TimerArray* time
         if (timers) timers->post_timer.stop();
         return true;
     }
+
+    bool SeetaFaceGender::predict_probs(const ImageData& image, std::vector<float>* probs,
+                                        TimerArray* timers) {
+        if (probs == nullptr) return false;
+        std::vector<ImageData> _images{image};
+        if (timers) timers->pre_timer.start();
+        if (!preprocessor_.run(&_images, &reused_input_tensors_)) {
+            MD_LOG_ERROR << "Failed to preprocess the input image." << std::endl;
+            return false;
+        }
+        if (timers) timers->pre_timer.stop();
+        reused_input_tensors_[0].set_name(get_input_info(0).name);
+        if (timers) timers->infer_timer.start();
+        if (!infer(reused_input_tensors_, &reused_output_tensors_)) {
+            MD_LOG_ERROR << "Failed to inference by runtime." << std::endl;
+            return false;
+        }
+        if (timers) timers->infer_timer.stop();
+        if (timers) timers->post_timer.start();
+        std::vector<std::vector<float>> all;
+        if (!postprocessor_.run_probs(reused_output_tensors_, &all)) {
+            MD_LOG_ERROR << "Failed to postprocess the inference results by runtime." << std::endl;
+            return false;
+        }
+        if (timers) timers->post_timer.stop();
+        if (all.empty()) return false;
+        *probs = std::move(all[0]);
+        return true;
+    }
 }
 

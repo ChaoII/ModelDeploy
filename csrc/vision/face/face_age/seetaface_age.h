@@ -35,6 +35,15 @@ namespace modeldeploy::vision::face {
          */
         virtual bool predict(const ImageData& image, int* age, TimerArray* timers = nullptr);
 
+        /** \brief 预测年龄概率分布（新增，附属于既有接口；下标=年龄 0..N-1，和为 1）
+         *
+         * \param[in] image 输入人脸图（建议为对齐/裁剪后的人脸）
+         * \param[out] dist 年龄分布
+         * \return true 成功
+         */
+        virtual bool predict_dist(const ImageData& image, std::vector<float>* dist,
+                                  TimerArray* timers = nullptr);
+
         /** \brief Predict the detection results for a batch of input images
          *
          * \param[in] images The input image list, each element comes from cv::imread()

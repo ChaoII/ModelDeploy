@@ -416,11 +416,12 @@ void Pipeline::detect_loop() {
                         boxes.push_back(std::move(b));
                     }
                 }
-                // 非检测 pipeline：boxes 已含 attributes（pedestrian_attribute）、text（ocr）
-                // 或几何框（face_detection / obb / iseg / pose）；classification 产出整帧框 +
-                // top-1 label + 类别分数 attributes（见 InferenceEngine::infer_classification），
-                // 同样并入事件，使云端 object_present（label 匹配）/attribute 叶子可命中
-                // （修复「假可配置」）。pose 框自带 keypoints（每人 17 点），随框进入事件。
+                // 非检测 pipeline：boxes 已含 attributes（pedestrian_attribute / face_attr /
+                // face_as）或 text（ocr）或几何框（face_detection / obb / iseg / pose / depth）；
+                // classification 产出整帧框 + top-1 label + 类别分数 attributes（见
+                // InferenceEngine::infer_classification），同样并入事件，使云端 object_present
+                // （label 匹配）/attribute/distance 叶子可命中（修复「假可配置」）。pose 框自带
+                // keypoints（每人 17 点）、depth 框自带 depth（米），随框进入事件。
                 // 空框结果不并入（不产生空事件）。
                 for (const auto& [name, r] : non_det) {
                     bool any_text = false;
@@ -430,6 +431,8 @@ void Pipeline::detect_loop() {
                     const bool has_boxes = !r.boxes.empty() &&
                         (r.type == "face_detection" || r.type == "obb" ||
                          r.type == "iseg" || r.type == "pose" ||
+                         r.type == "face_attr" || r.type == "face_as" ||
+                         r.type == "depth" ||
                          r.type == "classification");
                     if (r.attributes.empty() && !any_text && !has_boxes) continue;
                     for (const auto& b : r.boxes) boxes.push_back(b);

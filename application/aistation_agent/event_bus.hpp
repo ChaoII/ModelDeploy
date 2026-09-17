@@ -28,6 +28,9 @@ struct EventDetection {
     float text_score = 0.f;
     // 关键点（pose/face_landmark）：[x, y, score]，**归一化**坐标（0..1）
     std::vector<std::array<float, 3>> keypoints;
+    // 深度（depth 模型）：估算距离（米）；has_depth=true 才写入 objects[].depth（增量字段）
+    bool has_depth = false;
+    float depth = 0.f;
 };
 
 /// 检测事件（Agent → 云端，见设计 §7.2）

@@ -23,5 +23,14 @@ namespace modeldeploy::vision::face {
          * \return true if the postprocess successful, otherwise false
          */
         bool run(const std::vector<Tensor>& infer_result, std::vector<int>* genders) const;
+
+        /** \brief 额外输出每张脸的性别概率（新增，附属于既有接口）
+         *
+         * \param[in] infer_result 推理输出
+         * \param[out] probs 每张脸一组概率，下标 0=女、1=男（模型输出已 softmax，和为 1）
+         * \return true 成功
+         */
+        bool run_probs(const std::vector<Tensor>& infer_result,
+                       std::vector<std::vector<float>>* probs) const;
     };
 } // namespace modeldeploy::vision::faceid

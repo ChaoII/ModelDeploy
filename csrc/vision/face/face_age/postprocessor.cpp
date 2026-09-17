@@ -29,4 +29,26 @@ namespace modeldeploy::vision::face {
         }
         return true;
     }
+
+    bool SeetaFaceAgePostprocessor::run_dist(
+        const std::vector<Tensor>& infer_result, std::vector<std::vector<float>>* dists) const {
+        if (infer_result.empty() || dists == nullptr) return false;
+        if (infer_result[0].dtype() != DataType::FP32) {
+            MD_LOG_ERROR << "Only support post process with float32 data." << std::endl;
+            return false;
+        }
+        const auto& shape = infer_result[0].shape();
+        if (shape.size() < 2) return false;
+        // 输出 [N, C, ...]（如 [N,88,1,1]）；每张脸的年龄分布 = 该 batch 的 C 个元素
+        const size_t batch = static_cast<size_t>(shape[0]);
+        size_t ele_size = 1;
+        for (size_t d = 1; d < shape.size(); ++d) ele_size *= static_cast<size_t>(shape[d]);
+        const float* src = static_cast<const float*>(infer_result[0].data());
+        dists->resize(batch);
+        for (size_t bs = 0; bs < batch; ++bs) {
+            const float* p = src + bs * ele_size;
+            (*dists)[bs].assign(p, p + ele_size);
+        }
+        return true;
+    }
 }
