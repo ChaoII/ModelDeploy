@@ -84,6 +84,16 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             }
             if (cfg_.input_size.size() == 2)
                 iseg_model_->get_preprocessor().set_size(cfg_.input_size);
+        } else if (cfg.type == "pose") {
+            // 人体姿态关键点（YOLO-Pose）：每人框 + 17 点 (x, y, score)，关键点写入事件
+            pose_model_ = std::make_unique<detection::UltralyticsPose>(cfg.path, opt);
+            if (!pose_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] Pose model init failed: " << cfg.path << std::endl;
+                pose_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                pose_model_->get_preprocessor().set_size(cfg_.input_size);
         } else if (cfg.type == "pedestrian_attribute") {
             pa_model_ = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
                 cfg.path, cfg.rec_path, opt);
@@ -148,6 +158,9 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
         }
         if (iseg_model_) {
             iseg_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        }
+        if (pose_model_) {
+            pose_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
         }
         if (face_model_) {
             face_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
@@ -225,6 +238,7 @@ void InferenceEngine::unload() {
     cls_model_.reset();
     obb_model_.reset();
     iseg_model_.reset();
+    pose_model_.reset();
     face_model_.reset();
     pa_model_.reset();
     ocr_model_.reset();
@@ -248,6 +262,8 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_obb(image, result);
     if (cfg_.type == "iseg")
         return infer_iseg(image, result);
+    if (cfg_.type == "pose")
+        return infer_pose(image, result);
     if (cfg_.type == "pedestrian_attribute")
         return infer_pedestrian_attribute(image, result);
     if (cfg_.type == "ocr")
@@ -345,6 +361,30 @@ bool InferenceEngine::infer_iseg(const ImageData& image, InferResult* result) {
         box.label_name = (s.label_id >= 0 && static_cast<size_t>(s.label_id) < cfg_.labels.size())
                              ? cfg_.labels[static_cast<size_t>(s.label_id)]
                              : std::to_string(s.label_id);
+        result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_pose(const ImageData& image, InferResult* result) {
+    if (!pose_model_ || !result) return false;
+    std::vector<KeyPointsResult> pose_results;
+    if (!pose_model_->predict(image, &pose_results)) return false;
+    for (const auto& p : pose_results) {
+        // 每人一个人体框（像素坐标），label 取模型标签（缺省 "person"），
+        // 关键点 [x, y, score] 与框同坐标系（像素），由 EventBus 归一化后写入事件
+        DetectionBox box;
+        box.x = p.box.x; box.y = p.box.y;
+        box.w = p.box.width; box.h = p.box.height;
+        box.score = p.score;
+        box.label_id = p.label_id;
+        box.label_name = (p.label_id >= 0 && static_cast<size_t>(p.label_id) < cfg_.labels.size())
+                             ? cfg_.labels[static_cast<size_t>(p.label_id)]
+                             : "person";
+        box.keypoints.reserve(p.keypoints.size());
+        for (const auto& k : p.keypoints) {
+            box.keypoints.push_back({k.x, k.y, k.z});
+        }
         result->boxes.push_back(std::move(box));
     }
     return true;

@@ -26,6 +26,8 @@ struct EventDetection {
     // OCR：识别文字与文字置信度（空表示非 OCR 框）
     std::string text;
     float text_score = 0.f;
+    // 关键点（pose/face_landmark）：[x, y, score]，**归一化**坐标（0..1）
+    std::vector<std::array<float, 3>> keypoints;
 };
 
 /// 检测事件（Agent → 云端，见设计 §7.2）

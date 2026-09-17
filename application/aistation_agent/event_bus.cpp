@@ -1,5 +1,6 @@
 #include "event_bus.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <ctime>
 #include <random>
@@ -66,6 +67,12 @@ nlohmann::json DetectionEvent::to_json() const {
             dj["text"] = d.text;
             dj["text_score"] = d.text_score;
         }
+        // 关键点（pose）：非空才写入，形态 [[x, y, score], ...]（归一化）；旧事件无此字段
+        if (!d.keypoints.empty()) {
+            nlohmann::json kps = nlohmann::json::array();
+            for (const auto& k : d.keypoints) kps.push_back(nlohmann::json::array({k[0], k[1], k[2]}));
+            dj["keypoints"] = std::move(kps);
+        }
         objects.push_back(std::move(dj));
     }
     j["objects"] = std::move(objects);
@@ -125,6 +132,15 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
             e.detections[i].text_score = objs[i].value("text_score", 0.f);
             // 跟踪 ID（缺失视为未跟踪）
             e.detections[i].track_id = objs[i].value("track_id", -1);
+            // 关键点（pose，归一化 [x, y, score]；缺失/形状异常跳过）
+            if (objs[i].contains("keypoints") && objs[i]["keypoints"].is_array()) {
+                auto& out = e.detections[i].keypoints;
+                for (const auto& k : objs[i]["keypoints"]) {
+                    if (k.is_array() && k.size() >= 3 && k[0].is_number() && k[1].is_number() &&
+                        k[2].is_number())
+                        out.push_back({k[0].get<float>(), k[1].get<float>(), k[2].get<float>()});
+                }
+            }
         }
     }
     return e;
@@ -208,6 +224,17 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
             // OCR 文字透传
             ed.text = b.text;
             ed.text_score = b.text_score;
+            // 关键点（pose）透传并归一化：像素 → [0,1]（分数原样；越界钳制保证契约 0..1）
+            if (!b.keypoints.empty()) {
+                ed.keypoints.reserve(b.keypoints.size());
+                for (const auto& k : b.keypoints) {
+                    ed.keypoints.push_back({
+                        std::clamp(k[0] / static_cast<float>(frame_w), 0.f, 1.f),
+                        std::clamp(k[1] / static_cast<float>(frame_h), 0.f, 1.f),
+                        k[2],
+                    });
+                }
+            }
             if (st.meta.roi_polygon.size() >= 3 &&
                 !aistation::point_in_polygon(ed.x + ed.w * 0.5f, ed.y + ed.h * 0.5f, st.meta.roi_polygon)) {
                 continue;

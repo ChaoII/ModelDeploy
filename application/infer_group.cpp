@@ -187,7 +187,11 @@ bool InferGroup::run_models(
                 InferResult r;
                 if (e->infer(infer_frame, &r)) {
                     if (ox != 0.f || oy != 0.f) {
-                        for (auto& b : r.boxes) { b.x += ox; b.y += oy; }
+                        for (auto& b : r.boxes) {
+                            b.x += ox; b.y += oy;
+                            // pose：关键点与框同坐标系（裁剪帧），需一并回映射到全图
+                            for (auto& k : b.keypoints) { k[0] += ox; k[1] += oy; }
+                        }
                         for (auto& kps : r.keypoints)
                             for (auto& k : kps) { k.x += ox; k.y += oy; }
                     }

@@ -15,6 +15,12 @@ std::string normalize_model_type(const std::string& type) {
     if (type == "iseg" || type == "seg" || type == "instance_seg" ||
         type == "instance_segmentation")
         return "iseg";
+    // 人体姿态关键点（场景目录 POSE/FALL/CLIMB/SMOKE_PHONE/HAND_GESTURE 声明 type="pose"；
+    // 兼容 SDK 侧可能的其它拼写：pose_estimation / keypoint(s) / human_pose / yolo_pose）
+    if (type == "pose" || type == "pose_estimation" || type == "keypoint" ||
+        type == "keypoints" || type == "keypoint_detection" || type == "human_pose" ||
+        type == "yolo_pose")
+        return "pose";
     return type;
 }
 
