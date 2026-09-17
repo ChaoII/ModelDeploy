@@ -13,6 +13,8 @@
 #include "csrc/vision/sem/ultralytics_sem.h"
 #include "csrc/vision/landmark/face_landmark.h"
 #include "csrc/vision/barcode/barcode.h"
+#include "csrc/vision/sam/fastsam.h"
+#include "csrc/vision/face/insightface/recognition/insightface_recognition.h"
 #include "csrc/vision/face/face_det/scrfd.h"
 #include "csrc/vision/face/face_gender/seetaface_gender.h"
 #include "csrc/vision/face/face_age/seetaface_age.h"
@@ -45,6 +47,8 @@ struct DetectionBox {
     // 深度（depth 模型）：估算距离（米）；has_depth=true 才写入事件 objects[].depth
     bool has_depth = false;
     float depth = 0.f;
+    // 人脸嵌入（face_rec）：已 L2 归一化的 512-d 特征；非空才写入事件 objects[].embedding
+    std::vector<float> embedding;
 };
 
 /// 人脸关键点（最多 5 个：左右眼/鼻尖/左右嘴角）
@@ -132,6 +136,11 @@ private:
     std::unique_ptr<modeldeploy::vision::landmark::FaceLandmark> face_landmark_model_;
     // barcode：条码/二维码原生解码（ZXing，无 DNN 权重）
     std::unique_ptr<modeldeploy::vision::barcode::BarcodeDetector> barcode_detector_;
+    // sam：交互式分割（FastSAM-s；prompt_point 命中掩码 → 单个 segment 对象）
+    std::unique_ptr<modeldeploy::vision::seg::FastSam> sam_model_;
+    // face_rec：SCRFD 人脸检测 + ArcFace 嵌入（w600k_r50，512-d，事件 objects[].embedding）
+    std::unique_ptr<modeldeploy::vision::face::Scrfd> fr_det_model_;
+    std::unique_ptr<modeldeploy::vision::face::InsightFaceRecognition> fr_rec_model_;
     std::unique_ptr<modeldeploy::vision::pipeline::PedestrianAttribute> pa_model_;
     std::unique_ptr<modeldeploy::vision::ocr::PaddleOCR> ocr_model_;
     std::unique_ptr<modeldeploy::vision::lpr::LprPipeline> lpr_model_;
@@ -150,6 +159,8 @@ private:
     bool infer_face_landmark(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_doc(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_barcode(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_sam(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_face_rec(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_pedestrian_attribute(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_ocr(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_lpr(const modeldeploy::vision::ImageData& image, InferResult* result);

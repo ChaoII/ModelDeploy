@@ -50,6 +50,9 @@ void TaskConfig::print() const {
         if (!m.roi_norm.empty())
             std::cout << " roi_norm=[" << m.roi_norm[0] << "," << m.roi_norm[1]
                       << "," << m.roi_norm[2] << "," << m.roi_norm[3] << "]";
+        // sam 提示点：归一化 [x, y]
+        if (m.prompt_point.size() >= 2)
+            std::cout << " prompt_point=[" << m.prompt_point[0] << "," << m.prompt_point[1] << "]";
         std::cout << "\n";
     }
 }
@@ -120,6 +123,8 @@ json task_config_to_json(const TaskConfig& cfg) {
         if (!m.dict_path.empty()) mo["dict_path"] = m.dict_path;
         if (!m.labels.empty()) mo["labels"] = m.labels;
         if (!m.attributes.empty()) mo["attributes"] = m.attributes;
+        // sam 提示点（归一化 [x, y]）：仅非空时写出（增量字段，旧配置无此键）
+        if (!m.prompt_point.empty()) mo["prompt_point"] = m.prompt_point;
         if (!m.password.empty()) mo["password"] = m.password;
         j["models"].push_back(mo);
     }
@@ -209,6 +214,9 @@ TaskConfig task_config_from_json(const json& j) {
                 m.labels = mo["labels"].get<std::vector<std::string>>();
             if (mo.contains("attributes") && mo["attributes"].is_array())
                 m.attributes = mo["attributes"].get<std::vector<std::string>>();
+            if (mo.contains("prompt_point") && mo["prompt_point"].is_array() &&
+                mo["prompt_point"].size() >= 2)
+                m.prompt_point = {mo["prompt_point"][0], mo["prompt_point"][1]};
             if (mo.contains("password") && mo["password"].is_string())
                 m.password = mo["password"];
             cfg.models.push_back(m);

@@ -32,15 +32,18 @@ nlohmann::json detect_capabilities(int max_channels) {
 #endif
 
     // 模型族上报须与实际接线一致：obb/iseg/pose/face_attr/face_as/depth/sem/face_landmark/
-    // doc/barcode 已接入推理与事件（见 pipeline/inference_engine），名称与云端场景目录
-    // catalog.py 的声明对齐：type="obb"/"iseg"/"pose"/"face_attr"/"face_as"/"depth"/
-    // "sem"/"face_landmark"/"doc"/"barcode"。
+    // doc/barcode/sam/face_rec 已接入推理与事件（见 pipeline/inference_engine），名称与云端
+    // 场景目录 catalog.py 的声明对齐：type="obb"/"iseg"/"pose"/"face_attr"/"face_as"/"depth"/
+    // "sem"/"face_landmark"/"doc"/"barcode"/"sam"/"face_rec"。
     // face_attr → 人脸框 attributes{gender_male, age_young}；face_as → attributes{liveness}；
     // depth → objects[].depth（米）；sem → 整帧框 attributes{类别名: 占比}；
-    // face_landmark → objects[].keypoints（106 点，归一化）；doc/barcode → objects[].text。
+    // face_landmark → objects[].keypoints（106 点，归一化）；doc/barcode → objects[].text；
+    // sam（SAM_SEG）→ 提示点选段后的单个 segment 框（label="segment"）；
+    // face_rec（FACE_REC/STRANGER）→ 人脸框 objects[].embedding（512-d，已 L2 归一化）。
     json families = json::array({"det", "cls", "face", "pedestrian_attribute", "ocr", "lpr",
                                  "tracking", "obb", "iseg", "pose", "face_attr", "face_as",
-                                 "depth", "sem", "face_landmark", "doc", "barcode"});
+                                 "depth", "sem", "face_landmark", "doc", "barcode",
+                                 "sam", "face_rec"});
 
     json decode = json::array({"h264", "h265"});
     json encode = json::array({"h264"});

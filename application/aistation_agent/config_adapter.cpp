@@ -54,6 +54,16 @@ std::string normalize_model_type(const std::string& type) {
         type == "qr_code" || type == "bar_code" || type == "code_reader" ||
         type == "barcode_pipeline")
         return "barcode";
+    // 交互式分割（场景目录 SAM_SEG 的 pipeline 声明为 [iseg]，模型为 FastSAM-s）
+    if (type == "sam" || type == "fastsam" || type == "fast_sam" || type == "fastsam_s" ||
+        type == "fast_sam_s" || type == "sam_seg" || type == "segment_anything" ||
+        type == "sam_pipeline")
+        return "sam";
+    // 人脸识别/人脸嵌入（场景目录 FACE_REC/STRANGER 的 pipeline 为 [face_detection, face_rec]）
+    if (type == "face_rec" || type == "face_recognition" || type == "face_embedding" ||
+        type == "face_embed" || type == "face_feature" || type == "face_id" ||
+        type == "arcface" || type == "face_rec_pipeline")
+        return "face_rec";
     return type;
 }
 
@@ -137,13 +147,54 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
     out->roi_polygon = aistation::parse_roi_polygon(j.contains("roi") ? j["roi"] : nlohmann::json::array());
     out->schedule = aistation::parse_schedule(j.contains("schedule") ? j["schedule"] : nlohmann::json::object());
 
+    // 任务级提示点（SAM_SEG 场景参数 "prompt_point"，归一化 [x,y]）：模型条目未带时回退使用
+    std::vector<float> task_prompt;
+    if (j.contains("prompt_point") && j["prompt_point"].is_array() && j["prompt_point"].size() >= 2 &&
+        j["prompt_point"][0].is_number() && j["prompt_point"][1].is_number()) {
+        task_prompt = {std::clamp(j["prompt_point"][0].get<float>(), 0.f, 1.f),
+                       std::clamp(j["prompt_point"][1].get<float>(), 0.f, 1.f)};
+    } else if (j.contains("prompt_point") && j["prompt_point"].is_object() &&
+               j["prompt_point"].contains("x") && j["prompt_point"].contains("y") &&
+               j["prompt_point"]["x"].is_number() && j["prompt_point"]["y"].is_number()) {
+        task_prompt = {std::clamp(j["prompt_point"]["x"].get<float>(), 0.f, 1.f),
+                       std::clamp(j["prompt_point"]["y"].get<float>(), 0.f, 1.f)};
+    }
+
+    // 人脸检测器复用：目录 FACE_REC/STRANGER 的 pipeline 为 [face_detection, face_rec] 两条独立
+    // 模型，而 Agent 的 face_rec 是「检测 + 嵌入」复合模型。若 face_rec 条目未显式给出 det_url/
+    // det_path，则复用同一任务中 face_detection 条目的模型路径作为检测器（SCRFD）。
+    std::string shared_face_det;
+    if (j.contains("models") && j["models"].is_array()) {
+        for (const auto& mo : j["models"]) {
+            if (!mo.is_object() || !mo.contains("type") || !mo["type"].is_string()) continue;
+            if (normalize_model_type(mo["type"].get<std::string>()) != "face_detection") continue;
+            if (mo.contains("url") && mo["url"].is_string())
+                shared_face_det = mo["url"].get<std::string>();
+            else if (mo.contains("path") && mo["path"].is_string())
+                shared_face_det = mo["path"].get<std::string>();
+            if (!shared_face_det.empty()) break;
+        }
+    }
+
     // models
     out->sdk.models.clear();
     if (!j.contains("models") || !j["models"].is_array() || j["models"].empty())
         return fail("at least one model required");
     for (const auto& mo : j["models"]) {
+        // face_rec 缺检测器路径：注入同任务的 face_detection 模型路径（复合模型补齐）
+        json mo_eff = mo;
+        const bool is_face_rec = mo.is_object() && mo.contains("type") && mo["type"].is_string() &&
+            normalize_model_type(mo["type"].get<std::string>()) == "face_rec";
+        if (is_face_rec && !shared_face_det.empty() &&
+            !mo.contains("det_url") && !mo.contains("det_path")) {
+            mo_eff["det_url"] = shared_face_det;
+        }
         ModelConfig m;
-        if (!parse_one_model(mo, rect, &m, err)) return false;
+        if (!parse_one_model(mo_eff, rect, &m, err)) return false;
+        // sam/iseg：提示点模型条目优先，缺省用任务级 prompt_point（归一化 [x,y]）
+        if (m.prompt_point.empty() && !task_prompt.empty() &&
+            (m.type == "sam" || m.type == "iseg"))
+            m.prompt_point = task_prompt;
         out->sdk.models.push_back(std::move(m));
     }
 
@@ -218,6 +269,17 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         m.labels = mo["labels"].get<std::vector<std::string>>();
     if (mo.contains("attributes") && mo["attributes"].is_array())
         m.attributes = mo["attributes"].get<std::vector<std::string>>();
+    // 提示点（SAM_SEG；归一化 [x,y]）：支持 [x,y] 或 {"x":..,"y":..}，坐标钳制到 [0,1]
+    if (mo.contains("prompt_point")) {
+        const auto& pp = mo["prompt_point"];
+        if (pp.is_array() && pp.size() >= 2 && pp[0].is_number() && pp[1].is_number())
+            m.prompt_point = {std::clamp(pp[0].get<float>(), 0.f, 1.f),
+                              std::clamp(pp[1].get<float>(), 0.f, 1.f)};
+        else if (pp.is_object() && pp.contains("x") && pp.contains("y") &&
+                 pp["x"].is_number() && pp["y"].is_number())
+            m.prompt_point = {std::clamp(pp["x"].get<float>(), 0.f, 1.f),
+                              std::clamp(pp["y"].get<float>(), 0.f, 1.f)};
+    }
     if (mo.contains("password") && mo["password"].is_string())
         m.password = mo["password"].get<std::string>();
     m.roi_norm = roi_norm;
@@ -247,6 +309,21 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
     if (m.type == "barcode") {
         // 条码/二维码：走原生 ZXing 解码，无需 DNN 权重。刻意不解析/下载 url：
         // 目录 BARCODE 的 pipeline 为 [ocr]（云端可能下发 OCR 权重），本族忽略该权重。
+    } else if (m.type == "sam") {
+        // 交互式分割（FastSAM-s）：单模型，提示点由 prompt_point 提供（已在上方解析）
+        if (!resolve_first({"url", "path", "model_url", "model_path"}, &m.path)) return false;
+    } else if (m.type == "face_rec") {
+        // 人脸识别复合模型：det（SCRFD，复用 face_detection）+ rec（人脸嵌入，112→512-d）
+        // det 缺省由 from_json 从同任务 face_detection 条目补齐（目录 pipeline 为两条独立模型）
+        if (!resolve_first({"det_url", "det_path", "detector_url", "detector_path"}, &m.path))
+            return false;
+        if (!resolve_first({"rec_url", "rec_path", "embedding_url", "embedding_path",
+                            "face_rec_url", "face_rec_path"}, &m.rec_path))
+            return false;
+        // 未给显式嵌入键时，url|path 即嵌入模型（云侧 face_rec 角色的主模型）
+        if (m.rec_path.empty()) {
+            if (!resolve_first({"url", "path"}, &m.rec_path)) return false;
+        }
     } else if (m.type == "face_attr") {
         // 人脸性别/年龄复合模型：det（SCRFD）+ cls（性别）+ rec（年龄）
         if (!resolve_first({"det_url", "det_path", "url", "path"}, &m.path)) return false;
@@ -287,7 +364,8 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
     }
     // 单模型：path 优先；无 path 时本地/远端 url 均支持（远端经 ModelFetcher）
     // barcode 无权重：跳过路径解析（避免无谓下载），也不要求 path
-    if (m.path.empty() && m.type != "barcode") {
+    // face_rec 的 url|path 已解析为嵌入模型（rec_path），此处不得再当作检测器 path
+    if (m.path.empty() && m.type != "barcode" && m.type != "face_rec") {
         if (mo.contains("path") && mo["path"].is_string()) {
             m.path = mo["path"];
         } else if (mo.contains("url") && mo["url"].is_string()) {
@@ -307,6 +385,9 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
     if (m.name.empty()) return fail("model.name required");
     if (m.path.empty() && m.type != "barcode")
         return fail("model.path/url required for " + m.name);
+    // face_rec 还需嵌入模型（det 由 det_url 或同任务 face_detection 条目提供）
+    if (m.type == "face_rec" && m.rec_path.empty())
+        return fail("model.rec_url/url (face embedding) required for " + m.name);
     *out = std::move(m);
     return true;
 }

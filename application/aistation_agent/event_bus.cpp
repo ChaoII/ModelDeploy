@@ -76,6 +76,8 @@ nlohmann::json DetectionEvent::to_json() const {
         }
         // 深度（depth 模型）：仅在模型激活并产出有效距离时写入（增量字段，旧事件无此键）
         if (d.has_depth && std::isfinite(d.depth)) dj["depth"] = d.depth;
+        // 人脸嵌入（face_rec）：非空才写入（增量字段；已 L2 归一化，512-d ≈ 2KB/脸）
+        if (!d.embedding.empty()) dj["embedding"] = d.embedding;
         objects.push_back(std::move(dj));
     }
     j["objects"] = std::move(objects);
@@ -148,6 +150,13 @@ DetectionEvent DetectionEvent::from_json(const nlohmann::json& j) {
             if (objs[i].contains("depth") && objs[i]["depth"].is_number()) {
                 e.detections[i].depth = objs[i]["depth"].get<float>();
                 e.detections[i].has_depth = true;
+            }
+            // 人脸嵌入（face_rec，float 数组；仅数值项才恢复，形状异常跳过）
+            if (objs[i].contains("embedding") && objs[i]["embedding"].is_array()) {
+                auto& out = e.detections[i].embedding;
+                for (const auto& v : objs[i]["embedding"]) {
+                    if (v.is_number()) out.push_back(v.get<float>());
+                }
             }
         }
     }
@@ -248,6 +257,8 @@ void EventBus::on_detections(const std::string& task_id, const std::vector<Detec
                 ed.has_depth = true;
                 ed.depth = b.depth;
             }
+            // 人脸嵌入（face_rec）透传：已 L2 归一化，非空才携带（增量字段，其它家族无此键）
+            if (!b.embedding.empty()) ed.embedding = b.embedding;
             if (st.meta.roi_polygon.size() >= 3 &&
                 !aistation::point_in_polygon(ed.x + ed.w * 0.5f, ed.y + ed.h * 0.5f, st.meta.roi_polygon)) {
                 continue;

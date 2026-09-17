@@ -422,7 +422,8 @@ void Pipeline::detect_loop() {
                 // 类别分数 attributes（见 InferenceEngine::infer_classification），同样并入事件，
                 // 使云端 object_present（label 匹配）/attribute/distance 叶子可命中（修复「假可配置」）。
                 // pose 框自带 keypoints（每人 17 点）、face_landmark 框自带 106 点、depth 框自带
-                // depth（米）、sem 框自带类别占比 attributes，随框进入事件。
+                // depth（米）、sem 框自带类别占比 attributes、face_rec 框自带 embedding（512-d
+                // L2 归一化），随框进入事件；sam 框为 prompt_point 选中的单个 segment。
                 // 空框结果不并入（不产生空事件）。
                 for (const auto& [name, r] : non_det) {
                     bool any_text = false;
@@ -435,7 +436,8 @@ void Pipeline::detect_loop() {
                          r.type == "face_attr" || r.type == "face_as" ||
                          r.type == "depth" || r.type == "sem" ||
                          r.type == "face_landmark" || r.type == "doc" ||
-                         r.type == "barcode" ||
+                         r.type == "barcode" || r.type == "sam" ||
+                         r.type == "face_rec" ||
                          r.type == "classification");
                     if (r.attributes.empty() && !any_text && !has_boxes) continue;
                     for (const auto& b : r.boxes) boxes.push_back(b);

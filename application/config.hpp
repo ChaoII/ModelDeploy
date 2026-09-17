@@ -25,6 +25,8 @@ struct ModelConfig {
     int interval = 1;
     std::vector<std::string> labels;
     std::vector<std::string> attributes;  // 多标签属性名（按 attr_scores 下标；pedestrian_attribute 用）
+    // 交互分割提示点（SAM_SEG/sam）：归一化 [x, y]（0..1）；空 = 未提供，按最高分掩码兜底
+    std::vector<float> prompt_point;
     std::string password;                 // 加密模型解密口令
 };
 

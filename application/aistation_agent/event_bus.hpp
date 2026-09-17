@@ -31,6 +31,8 @@ struct EventDetection {
     // 深度（depth 模型）：估算距离（米）；has_depth=true 才写入 objects[].depth（增量字段）
     bool has_depth = false;
     float depth = 0.f;
+    // 人脸嵌入（face_rec）：已 L2 归一化（|v|≈1）的 512-d 特征；非空才写入 objects[].embedding
+    std::vector<float> embedding;
 };
 
 /// 检测事件（Agent → 云端，见设计 §7.2）

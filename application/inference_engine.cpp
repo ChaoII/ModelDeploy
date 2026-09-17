@@ -72,6 +72,64 @@ std::string class_name_of(const ModelConfig& cfg, int id) {
         return cfg.labels[id];
     return "class" + std::to_string(id);
 }
+
+// 分割掩码是否命中像素点。掩码为「框局部坐标」（shape={h,w}，原点 = 框左上角，
+// 见 iseg/sam postprocessor），故先把像素点换算到框内下标再取布尔值。
+bool mask_hits_point(const InstanceSegResult& r, float px, float py) {
+    if (r.mask.shape.size() < 2) return false;
+    const int h = static_cast<int>(r.mask.shape[0]);
+    const int w = static_cast<int>(r.mask.shape[1]);
+    if (h <= 0 || w <= 0 || r.mask.buffer.size() < static_cast<size_t>(h) * static_cast<size_t>(w))
+        return false;
+    const int mx = static_cast<int>(px - r.box.x);
+    const int my = static_cast<int>(py - r.box.y);
+    if (mx < 0 || my < 0 || mx >= w || my >= h) return false;
+    return r.mask.buffer[static_cast<size_t>(my) * static_cast<size_t>(w) + mx] != 0;
+}
+
+// 交互式提示点 → 选中的分割实例（返回下标，-1 = 无可用实例）：
+// 1) 有提示点时，取「掩码命中该点」的实例中分数最高者；
+// 2) 无提示点、或提示点未命中任何掩码（含掩码缺失）→ 回退全体最高分实例；
+// 3) 无几何（宽高非正）的实例不参与。
+int select_segment_index(const std::vector<InstanceSegResult>& segs, const float* point) {
+    int best_hit = -1;
+    float best_hit_score = -1.f;
+    int best_any = -1;
+    float best_any_score = -1.f;
+    for (size_t i = 0; i < segs.size(); ++i) {
+        const auto& s = segs[i];
+        if (!(s.box.width > 0.f && s.box.height > 0.f)) continue;
+        if (s.score > best_any_score) {
+            best_any_score = s.score;
+            best_any = static_cast<int>(i);
+        }
+        if (point && mask_hits_point(s, point[0], point[1]) && s.score > best_hit_score) {
+            best_hit_score = s.score;
+            best_hit = static_cast<int>(i);
+        }
+    }
+    return best_hit >= 0 ? best_hit : best_any;
+}
+
+// 提示点（归一化 [0,1]）→ 像素坐标；未配置或帧尺寸非法返回 false（调用方走最高分兜底）。
+bool prompt_to_pixel(const ModelConfig& cfg, float frame_w, float frame_h, float* out) {
+    if (!out || cfg.prompt_point.size() < 2) return false;
+    if (!(frame_w > 0.f && frame_h > 0.f)) return false;
+    out[0] = std::clamp(cfg.prompt_point[0], 0.f, 1.f) * frame_w;
+    out[1] = std::clamp(cfg.prompt_point[1], 0.f, 1.f) * frame_h;
+    return true;
+}
+
+// 原地 L2 归一化：范数为 0/非有限时返回 false（不产生无效嵌入，fail-closed）。
+bool l2_normalize(std::vector<float>* v) {
+    if (!v || v->empty()) return false;
+    double sum = 0.0;
+    for (float x : *v) sum += static_cast<double>(x) * static_cast<double>(x);
+    const double norm = std::sqrt(sum);
+    if (!std::isfinite(norm) || !(norm > 1e-12)) return false;
+    for (float& x : *v) x = static_cast<float>(static_cast<double>(x) / norm);
+    return true;
+}
 }  // namespace
 
 bool InferenceEngine::load(const ModelConfig& cfg) {
@@ -224,6 +282,36 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
         } else if (cfg.type == "barcode") {
             // 条码/二维码：原生 ZXing 解码（无 DNN 权重，path 可空）
             barcode_detector_ = std::make_unique<barcode::BarcodeDetector>();
+        } else if (cfg.type == "sam") {
+            // 交互式分割（FastSAM-s，1×3×640×640 → [1,37,8400] box + [1,32,160,160] 掩码原型）：
+            // 一次出 box + mask，按 prompt_point 选段（见 infer_sam）
+            sam_model_ = std::make_unique<seg::FastSam>(cfg.path, opt);
+            if (!sam_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] FastSAM model init failed: " << cfg.path << std::endl;
+                sam_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                sam_model_->get_preprocessor().set_size(cfg_.input_size);
+            sam_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        } else if (cfg.type == "face_rec") {
+            // 人脸识别复合模型：SCRFD 检测 + ArcFace 嵌入（w600k_r50，112→512-d，见 infer_face_rec）
+            if (cfg.rec_path.empty()) {
+                std::cerr << "[InferenceEngine] face_rec requires rec_path(embedding)" << std::endl;
+                return false;
+            }
+            fr_det_model_ = std::make_unique<face::Scrfd>(cfg.path, opt);
+            fr_rec_model_ = std::make_unique<face::InsightFaceRecognition>(cfg.rec_path, opt);
+            if (!fr_det_model_->is_initialized() || !fr_rec_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] face_rec init failed: " << cfg.path << " | "
+                          << cfg.rec_path << std::endl;
+                fr_det_model_.reset();
+                fr_rec_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                fr_det_model_->get_preprocessor().set_size(cfg_.input_size);
+            fr_det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
         } else if (cfg.type == "pedestrian_attribute") {
             pa_model_ = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
                 cfg.path, cfg.rec_path, opt);
@@ -380,6 +468,9 @@ void InferenceEngine::unload() {
     sem_model_.reset();
     face_landmark_model_.reset();
     barcode_detector_.reset();
+    sam_model_.reset();
+    fr_det_model_.reset();
+    fr_rec_model_.reset();
     pa_model_.reset();
     ocr_model_.reset();
     lpr_model_.reset();
@@ -418,6 +509,10 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_doc(image, result);
     if (cfg_.type == "barcode")
         return infer_barcode(image, result);
+    if (cfg_.type == "sam")
+        return infer_sam(image, result);
+    if (cfg_.type == "face_rec")
+        return infer_face_rec(image, result);
     if (cfg_.type == "pedestrian_attribute")
         return infer_pedestrian_attribute(image, result);
     if (cfg_.type == "ocr")
@@ -506,6 +601,23 @@ bool InferenceEngine::infer_iseg(const ImageData& image, InferResult* result) {
     if (!iseg_model_ || !result) return false;
     std::vector<InstanceSegResult> seg_results;
     if (!iseg_model_->predict(image, &seg_results)) return false;
+    // SAM_SEG 兼容：云端场景目录 SAM_SEG 的 pipeline 声明为 [iseg]（type="iseg"），
+    // 若任务带提示点则按交互式分割语义只输出「命中提示点（无命中则最高分）」的单个 segment
+    // 对象（label="segment"）；未配置 prompt_point 时行为与既有实例分割完全一致。
+    float pt[2] = {0.f, 0.f};
+    if (prompt_to_pixel(cfg_, static_cast<float>(image.width()),
+                        static_cast<float>(image.height()), pt)) {
+        const int idx = select_segment_index(seg_results, pt);
+        if (idx < 0) return true;
+        const auto& s = seg_results[static_cast<size_t>(idx)];
+        DetectionBox box;
+        box.x = s.box.x; box.y = s.box.y; box.w = s.box.width; box.h = s.box.height;
+        box.score = s.score;
+        box.label_id = s.label_id;
+        box.label_name = "segment";
+        result->boxes.push_back(std::move(box));
+        return true;
+    }
     for (const auto& s : seg_results) {
         // 掩码不入事件（带宽/契约），只送实例框；语义见批次文档
         DetectionBox box;
@@ -774,6 +886,73 @@ bool InferenceEngine::infer_barcode(const ImageData& image, InferResult* result)
         box.text_score = c.score;
         // label 用码制名（QR_CODE/EAN_13...）保证非空；供事件节流键与人工排查
         box.label_name = c.format.empty() ? "barcode" : c.format;
+        result->boxes.push_back(std::move(box));
+    }
+    return true;
+}
+
+bool InferenceEngine::infer_sam(const ImageData& image, InferResult* result) {
+    if (!sam_model_ || !result) return false;
+    // FastSAM 预处走 image.asMat（packed CPU）：NV12（硬解/摄像头帧）先转 BGR，避免越界
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    const float W = static_cast<float>(frame.width());
+    const float H = static_cast<float>(frame.height());
+    std::vector<InstanceSegResult> segs;
+    if (!sam_model_->predict(frame, &segs)) return false;
+    if (segs.empty()) return true;   // 无实例：不产生对象（fail-closed）
+    // 提示点（归一化）→ 像素，映射到「掩码命中该点」的实例（分数最高者）；
+    // 无提示点 / 提示点未命中任何掩码 → 回退最高分掩码（兜底，见 select_segment_index）。
+    float pt[2] = {0.f, 0.f};
+    const bool has_prompt = prompt_to_pixel(cfg_, W, H, pt);
+    const int idx = select_segment_index(segs, has_prompt ? pt : nullptr);
+    if (idx < 0) return true;
+    const auto& s = segs[static_cast<size_t>(idx)];
+    // 只送实例框：像素坐标由事件层按帧宽高归一化（与 detection 同契约），云端无需新字段
+    DetectionBox box;
+    box.x = s.box.x; box.y = s.box.y; box.w = s.box.width; box.h = s.box.height;
+    box.score = s.score;
+    box.label_id = s.label_id;
+    // label 固定 "segment"：云端 prompt_segment/object_present 叶子按此名判定
+    box.label_name = "segment";
+    result->boxes.push_back(std::move(box));
+    return true;
+}
+
+bool InferenceEngine::infer_face_rec(const ImageData& image, InferResult* result) {
+    if (!fr_det_model_ || !fr_rec_model_ || !result) return false;
+    // SCRFD / ArcFace 预处只支持 packed BGR：NV12 帧先转换（同 face_attr/face_as 崩溃修复）
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    std::vector<KeyPointsResult> faces;
+    if (!fr_det_model_->predict(frame, &faces)) return false;
+    const float thresh = cfg_.confidence_threshold;
+    // 逐脸收集 5 点（ArcFace 对齐所需）：缺失/不足 5 点的检测跳过（无法对齐即不产嵌入）
+    std::vector<std::vector<std::array<float, 2>>> kps_list;
+    std::vector<size_t> kept;
+    for (size_t i = 0; i < faces.size(); ++i) {
+        const auto& f = faces[i];
+        if (f.score < thresh || f.keypoints.size() < 5) continue;
+        std::vector<std::array<float, 2>> kps;
+        kps.reserve(5);
+        for (int k = 0; k < 5; ++k) kps.push_back({f.keypoints[k].x, f.keypoints[k].y});
+        kps_list.push_back(std::move(kps));
+        kept.push_back(i);
+    }
+    if (kps_list.empty()) return true;   // 无人脸：无对象（不伪造嵌入）
+    std::vector<std::vector<float>> embeddings;
+    if (!fr_rec_model_->batch_predict(frame, kps_list, &embeddings)) return false;
+    const size_t n = std::min(kept.size(), embeddings.size());
+    for (size_t j = 0; j < n; ++j) {
+        std::vector<float>& emb = embeddings[j];
+        if (!l2_normalize(&emb)) continue;   // 无效嵌入（全零/非有限）丢弃
+        const auto& f = faces[kept[j]];
+        DetectionBox box;
+        box.x = f.box.x; box.y = f.box.y; box.w = f.box.width; box.h = f.box.height;
+        box.score = f.score;
+        box.label_id = f.label_id;
+        box.label_name = "face";
+        box.embedding = std::move(emb);   // 已 L2 归一化（512-d，w600k_r50）
         result->boxes.push_back(std::move(box));
     }
     return true;
