@@ -74,6 +74,17 @@ std::string normalize_model_type(const std::string& type) {
     if (type == "reid" || type == "re_id" || type == "osnet" || type == "person_reid" ||
         type == "pedestrian_reid" || type == "reid_embedding" || type == "reid_pipeline")
         return "reid";
+    // 视频动作分类（场景目录 ACTION_CLS 声明 type="action"，PP-TSMv2，16 帧）
+    if (type == "action" || type == "action_cls" || type == "video_action" ||
+        type == "action_recognition" || type == "action_classification" ||
+        type == "action_tsm" || type == "tsm" || type == "pptsm" || type == "pptsm_v2" ||
+        type == "tsn" || type == "action_pipeline")
+        return "action";
+    // 骨架动作分类（场景目录 ACTION_SKELETON 声明 type="action_skeleton"，pipeline [det,pose,cls]）
+    if (type == "action_skeleton" || type == "skeleton_action" || type == "st_gcn" ||
+        type == "stgcn" || type == "action_stgcn" || type == "skeleton_gcn" ||
+        type == "action_skeleton_pipeline")
+        return "action_skeleton";
     return type;
 }
 
@@ -176,11 +187,12 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
     // det_path，则复用同一任务中 face_detection 条目的模型路径作为检测器（SCRFD）。
     std::string shared_face_det;
     std::string shared_det;
+    std::string shared_pose;
     if (j.contains("models") && j["models"].is_array()) {
         for (const auto& mo : j["models"]) {
             if (!mo.is_object() || !mo.contains("type") || !mo["type"].is_string()) continue;
             const std::string nt = normalize_model_type(mo["type"].get<std::string>());
-            if (nt != "face_detection" && nt != "detection") continue;
+            if (nt != "face_detection" && nt != "detection" && nt != "pose") continue;
             std::string path;
             if (mo.contains("url") && mo["url"].is_string())
                 path = mo["url"].get<std::string>();
@@ -189,6 +201,7 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
             if (path.empty()) continue;
             if (nt == "face_detection" && shared_face_det.empty()) shared_face_det = path;
             if (nt == "detection" && shared_det.empty()) shared_det = path;
+            if (nt == "pose" && shared_pose.empty()) shared_pose = path;
         }
     }
 
@@ -213,6 +226,15 @@ bool ConfigAdapter::from_json(const json& j, AdaptedTask* out, std::string* err)
             normalize_model_type(mo["type"].get<std::string>()) == "reid";
         if (is_reid && !shared_det.empty() && !mo.contains("det_url") && !mo.contains("det_path"))
             mo_eff["det_url"] = shared_det;
+        // action_skeleton 缺关键点模型路径：注入同任务 pose 模型路径（目录 pipeline 为 [det,pose,cls]）
+        const bool is_action_skeleton = mo.is_object() && mo.contains("type") &&
+            mo["type"].is_string() &&
+            normalize_model_type(mo["type"].get<std::string>()) == "action_skeleton";
+        const bool has_pose_key = mo.contains("pose_url") || mo.contains("pose_path") ||
+            mo.contains("keypoint_url") || mo.contains("keypoint_path") ||
+            mo.contains("rec_url") || mo.contains("rec_path");
+        if (is_action_skeleton && !shared_pose.empty() && !has_pose_key)
+            mo_eff["pose_url"] = shared_pose;
         ModelConfig m;
         if (!parse_one_model(mo_eff, rect, &m, err)) return false;
         // sam/iseg：提示点模型条目优先，缺省用任务级 prompt_point（归一化 [x,y]）
@@ -366,6 +388,24 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         if (m.rec_path.empty()) {
             if (!resolve_first({"url", "path"}, &m.rec_path)) return false;
         }
+    } else if (m.type == "action") {
+        // 视频动作分类（PP-TSMv2，16 帧）：单模型；topk 控制 attributes 的 Top-K（默认 5）
+        if (!resolve_first({"url", "path", "model_url", "model_path"}, &m.path)) return false;
+        if (mo.contains("topk") && mo["topk"].is_number_integer())
+            m.top_k = std::max(1, mo["topk"].get<int>());
+        else if (mo.contains("top_k") && mo["top_k"].is_number_integer())
+            m.top_k = std::max(1, mo["top_k"].get<int>());
+    } else if (m.type == "action_skeleton") {
+        // 骨架动作分类（ST-GCN）：主模型（url|path = STGCN）+ 关键点模型（pose_url 等 = yolo-pose）
+        // pose 缺省由 from_json 从同任务 pose 条目补齐（目录 ACTION_SKELETON pipeline 为 [det,pose,cls]）
+        if (!resolve_first({"pose_url", "pose_path", "keypoint_url", "keypoint_path",
+                            "rec_url", "rec_path"}, &m.rec_path)) return false;
+        if (!resolve_first({"url", "path", "model_url", "model_path",
+                            "stgcn_url", "stgcn_path"}, &m.path)) return false;
+        if (mo.contains("topk") && mo["topk"].is_number_integer())
+            m.top_k = std::max(1, mo["topk"].get<int>());
+        else if (mo.contains("top_k") && mo["top_k"].is_number_integer())
+            m.top_k = std::max(1, mo["top_k"].get<int>());
     } else if (m.type == "face_landmark") {
         // 人脸关键点复合模型：det（SCRFD，逐脸检测）+ landmark（2d106det，逐脸 106 点）。
         // 口径与 face_rec 对齐：det_url→path（检测器），landmark_url|url|path→rec_path（关键点模型）。
@@ -454,6 +494,8 @@ bool ConfigAdapter::parse_one_model(const json& mo, const std::vector<float>& ro
         return fail("model.rec_url/url (face embedding) required for " + m.name);
     if (m.type == "reid" && m.rec_path.empty())
         return fail("model.reid_url/url (reid embedding) required for " + m.name);
+    if (m.type == "action_skeleton" && m.rec_path.empty())
+        return fail("model.pose_url/url (pose model) required for " + m.name);
     *out = std::move(m);
     return true;
 }

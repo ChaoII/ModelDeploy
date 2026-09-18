@@ -73,6 +73,58 @@ std::string class_name_of(const ModelConfig& cfg, int id) {
     return "class" + std::to_string(id);
 }
 
+// 视频动作滚动缓冲的单帧：转 packed BGR 并将短边缩放到 kShortSide（控内存）。
+// 始终返回**自持有**数据的 ImageData（resize/clone），避免缓冲持有解码帧的浅引用。
+ImageData make_action_buffer_frame(const ImageData& image) {
+    ImageData bgr = to_packed_bgr(image);
+    if (bgr.empty()) return {};
+    const int w = bgr.width(), h = bgr.height();
+    if (w <= 0 || h <= 0) return {};
+    const int short_side = std::min(w, h);
+    if (short_side > static_cast<int>(action::ActionCls::kShortSide)) {
+        const double s = static_cast<double>(action::ActionCls::kShortSide) /
+                         static_cast<double>(short_side);
+        return bgr.resize(std::max(1, static_cast<int>(std::lround(w * s))),
+                          std::max(1, static_cast<int>(std::lround(h * s))));
+    }
+    return bgr.clone();
+}
+
+// scores 的 top-k 下标（降序；k<=0 视为 1）；k>=size 时返回全部下标。
+std::vector<int> topk_indices(const std::vector<float>& scores, int k) {
+    std::vector<int> idx(scores.size());
+    for (size_t i = 0; i < idx.size(); ++i) idx[i] = static_cast<int>(i);
+    const int n = std::max(1, k);
+    if (static_cast<int>(idx.size()) > n) {
+        std::partial_sort(idx.begin(), idx.begin() + n, idx.end(),
+                          [&](int a, int b) { return scores[a] > scores[b]; });
+        idx.resize(static_cast<size_t>(n));
+    }
+    return idx;
+}
+
+// 分类式契约结果：整帧框（像素 0,0,W,H → 事件归一化 0,0,1,1）+ top-1 label +
+// Top-K 类别分数 attributes（对齐 classification 切片；Top-K 上限由 cfg.top_k 控制）。
+InferResult make_action_result(const ModelConfig& cfg, const std::string& type,
+                               const std::vector<float>& scores, int w, int h) {
+    InferResult r;
+    r.model_name = cfg.name;
+    r.type = type;
+    const std::vector<int> top = topk_indices(scores, cfg.top_k);
+    const int id = top.empty() ? -1 : top[0];
+    DetectionBox box;
+    box.x = 0.f;
+    box.y = 0.f;
+    box.w = static_cast<float>(w);
+    box.h = static_cast<float>(h);
+    box.label_id = id;
+    box.score = (id >= 0 && id < static_cast<int>(scores.size())) ? scores[id] : 0.f;
+    box.label_name = class_name_of(cfg, id);
+    for (int i : top) box.attributes.emplace_back(class_name_of(cfg, i), scores[i]);
+    r.boxes.push_back(std::move(box));
+    return r;
+}
+
 // 分割掩码是否命中像素点。掩码为「框局部坐标」（shape={h,w}，原点 = 框左上角，
 // 见 iseg/sam postprocessor），故先把像素点换算到框内下标再取布尔值。
 bool mask_hits_point(const InstanceSegResult& r, float px, float py) {
@@ -358,6 +410,34 @@ bool InferenceEngine::load(const ModelConfig& cfg) {
             if (cfg_.input_size.size() == 2)
                 reid_det_model_->get_preprocessor().set_size(cfg_.input_size);
             reid_det_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
+        } else if (cfg.type == "action") {
+            // 视频动作分类（PP-TSMv2，16 帧）：单模型；跨帧滚动缓冲由本引擎维护（见 infer_action）
+            action_model_ = std::make_unique<action::ActionCls>(cfg.path, opt);
+            if (!action_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] ActionCls model init failed: " << cfg.path
+                          << std::endl;
+                action_model_.reset();
+                return false;
+            }
+        } else if (cfg.type == "action_skeleton") {
+            // 骨架动作分类（ST-GCN）：主模型（STGCN）+ 关键点模型（yolo-pose，rec_path）
+            if (cfg.rec_path.empty()) {
+                std::cerr << "[InferenceEngine] action_skeleton requires rec_path(pose model)"
+                          << std::endl;
+                return false;
+            }
+            action_skeleton_model_ = std::make_unique<action::ActionSkeleton>(cfg.path, opt);
+            as_pose_model_ = std::make_unique<detection::UltralyticsPose>(cfg.rec_path, opt);
+            if (!action_skeleton_model_->is_initialized() || !as_pose_model_->is_initialized()) {
+                std::cerr << "[InferenceEngine] action_skeleton init failed: " << cfg.path
+                          << " | " << cfg.rec_path << std::endl;
+                action_skeleton_model_.reset();
+                as_pose_model_.reset();
+                return false;
+            }
+            if (cfg_.input_size.size() == 2)
+                as_pose_model_->get_preprocessor().set_size(cfg_.input_size);
+            as_pose_model_->get_postprocessor().set_conf_threshold(cfg_.confidence_threshold);
         } else if (cfg.type == "pedestrian_attribute") {
             pa_model_ = std::make_unique<modeldeploy::vision::pipeline::PedestrianAttribute>(
                 cfg.path, cfg.rec_path, opt);
@@ -521,6 +601,19 @@ void InferenceEngine::unload() {
     hand_model_.reset();
     reid_det_model_.reset();
     reid_model_.reset();
+    action_model_.reset();
+    action_skeleton_model_.reset();
+    as_pose_model_.reset();
+    action_frames_.clear();
+    action_since_run_ = 0;
+    action_run_count_ = 0;
+    action_has_result_ = false;
+    action_last_result_ = InferResult();
+    as_skeletons_.clear();
+    as_since_run_ = 0;
+    as_run_count_ = 0;
+    as_has_result_ = false;
+    as_last_result_ = InferResult();
     pa_model_.reset();
     ocr_model_.reset();
     lpr_model_.reset();
@@ -567,6 +660,10 @@ bool InferenceEngine::infer(const ImageData& image, InferResult* result) {
         return infer_hand(image, result);
     if (cfg_.type == "reid")
         return infer_reid(image, result);
+    if (cfg_.type == "action")
+        return infer_action(image, result);
+    if (cfg_.type == "action_skeleton")
+        return infer_action_skeleton(image, result);
     if (cfg_.type == "pedestrian_attribute")
         return infer_pedestrian_attribute(image, result);
     if (cfg_.type == "ocr")
@@ -1136,6 +1233,88 @@ bool InferenceEngine::infer_reid(const ImageData& image, InferResult* result) {
             result->boxes.push_back(std::move(b));
         }
     }
+    return true;
+}
+
+bool InferenceEngine::infer_action(const ImageData& image, InferResult* result) {
+    if (!action_model_ || !result) return false;
+    // 滚动缓冲：短边 256 的 BGR 副本（控内存），容量 2*T，均匀采样 T 帧成片段。
+    ImageData frame = make_action_buffer_frame(image);
+    if (frame.empty()) return false;
+    action_frames_.push_back(std::move(frame));
+    const int64_t T = std::max<int64_t>(1, action_model_->num_frames());
+    const size_t cap = static_cast<size_t>(2 * T);
+    while (action_frames_.size() > cap) action_frames_.pop_front();
+    ++action_since_run_;
+    // cadence：缓冲满 T 帧后每 T 帧推理一次；期间复用上次结果（见批次报告的时延说明）
+    if (static_cast<int64_t>(action_frames_.size()) >= T && action_since_run_ >= T) {
+        action_since_run_ = 0;
+        std::vector<ImageData> clip(action_frames_.begin(), action_frames_.end());
+        std::vector<float> scores;
+        if (!action_model_->predict(clip, &scores) || scores.empty()) return false;
+        action_last_result_ = make_action_result(cfg_, "action", scores, image.width(), image.height());
+        action_has_result_ = true;
+        ++action_run_count_;
+    }
+    if (!action_has_result_) return true;   // 尚未就绪：空结果（不产生事件）
+    *result = action_last_result_;
+    return true;
+}
+
+bool InferenceEngine::infer_action_skeleton(const ImageData& image, InferResult* result) {
+    if (!action_skeleton_model_ || !as_pose_model_ || !result) return false;
+    // yolo-pose 预处理只支持 packed BGR：NV12 帧先转换
+    ImageData frame = to_packed_bgr(image);
+    if (frame.empty()) return false;
+    std::vector<KeyPointsResult> persons;
+    if (!as_pose_model_->predict(frame, &persons)) return false;
+
+    const int64_t V = std::max<int64_t>(1, action_skeleton_model_->num_joints());
+    const int64_t M = std::max<int64_t>(1, action_skeleton_model_->num_persons());
+    // 取面积最大的至多 M 个人（近似 NTU 预处理「取置信度最高的 2 人」）
+    std::stable_sort(persons.begin(), persons.end(),
+                     [](const KeyPointsResult& a, const KeyPointsResult& b) {
+                         return a.box.width * a.box.height > b.box.width * b.box.height;
+                     });
+    std::vector<Point3f> flat(static_cast<size_t>(M * V));
+    for (int64_t m = 0; m < M && m < static_cast<int64_t>(persons.size()); ++m) {
+        const std::vector<Point3f> ntu =
+            action::ActionSkeleton::coco17_to_ntu25(persons[static_cast<size_t>(m)].keypoints);
+        for (int64_t v = 0; v < V; ++v)
+            flat[m * V + v] = (v < static_cast<int64_t>(ntu.size()))
+                                  ? ntu[static_cast<size_t>(v)]
+                                  : Point3f();
+    }
+    as_skeletons_.push_back(std::move(flat));
+    const int64_t T = std::max<int64_t>(1, action_skeleton_model_->num_frames());
+    const size_t cap = static_cast<size_t>(T);   // 缓冲上界 = 片段长
+    while (as_skeletons_.size() > cap) as_skeletons_.pop_front();
+    ++as_since_run_;
+    if (static_cast<int64_t>(as_skeletons_.size()) >= T && as_since_run_ >= T) {
+        as_since_run_ = 0;
+        // 全零骨架（无有效人体）不推理，避免对空输入输出无意义类别（fail-closed）
+        bool any_frame_valid = false;
+        for (const auto& f : as_skeletons_) {
+            for (const auto& p : f) {
+                if (p.x != 0.f || p.y != 0.f || p.z != 0.f) {
+                    any_frame_valid = true;
+                    break;
+                }
+            }
+            if (any_frame_valid) break;
+        }
+        if (!any_frame_valid) return true;
+        action::KeyPointSeq seq;
+        seq.frames.assign(as_skeletons_.begin(), as_skeletons_.end());
+        std::vector<float> scores;
+        if (!action_skeleton_model_->predict(seq, &scores) || scores.empty()) return false;
+        as_last_result_ =
+            make_action_result(cfg_, "action_skeleton", scores, image.width(), image.height());
+        as_has_result_ = true;
+        ++as_run_count_;
+    }
+    if (!as_has_result_) return true;   // 尚未就绪：空结果（不产生事件）
+    *result = as_last_result_;
     return true;
 }
 

@@ -23,6 +23,8 @@ struct ModelConfig {
     std::vector<int> roi = {0, 0, 0, 0};
     std::vector<float> roi_norm;          // 归一化 [x,y,w,h]，非空时按帧宽高换算 ROI（Agent 用）
     int interval = 1;
+    // 分类/动作类别分数写入事件的 Top-K 上限（action/action_skeleton 用；<=0 视为 1）
+    int top_k = 5;
     std::vector<std::string> labels;
     std::vector<std::string> attributes;  // 多标签属性名（按 attr_scores 下标；pedestrian_attribute 用）
     // 交互分割提示点（SAM_SEG/sam）：归一化 [x, y]（0..1）；空 = 未提供，按最高分掩码兜底

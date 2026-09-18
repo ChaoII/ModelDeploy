@@ -4,12 +4,15 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <deque>
 
 #include "csrc/vision/detection/ultralytics_det.h"
 #include "csrc/vision/classification/classification.h"
 #include "csrc/vision/obb/ultralytics_obb.h"
 #include "csrc/vision/iseg/ultralytics_seg.h"
 #include "csrc/vision/pose/ultralytics_pose.h"
+#include "csrc/vision/action/action_cls.h"
+#include "csrc/vision/action/action_skeleton.h"
 #include "csrc/vision/hand/hand_landmark.h"
 #include "csrc/vision/reid/reid.h"
 #include "csrc/vision/sem/ultralytics_sem.h"
@@ -94,6 +97,12 @@ public:
     void unload();
     bool is_loaded() const { return loaded_; }
 
+    // 时序缓冲可观测性（供测试断言「缓冲有界」「cadence 生效」；非生产关键路径）
+    size_t action_buffer_size() const { return action_frames_.size(); }
+    int64_t action_run_count() const { return action_run_count_; }
+    size_t action_skeleton_buffer_size() const { return as_skeletons_.size(); }
+    int64_t action_skeleton_run_count() const { return as_run_count_; }
+
     bool infer(const modeldeploy::vision::ImageData& image, InferResult* result);
 
     /// 获取底层 detection 模型指针（BatchScheduler 需要直接调用 batch_predict）
@@ -146,11 +155,31 @@ private:
     // face_rec：SCRFD 人脸检测 + ArcFace 嵌入（w600k_r50，512-d，事件 objects[].embedding）
     std::unique_ptr<modeldeploy::vision::face::Scrfd> fr_det_model_;
     std::unique_ptr<modeldeploy::vision::face::InsightFaceRecognition> fr_rec_model_;
+    // action：PP-TSMv2（Kinetics-400, 16 帧）整帧动作分类；跨帧滚动缓冲见下方成员
+    std::unique_ptr<modeldeploy::vision::action::ActionCls> action_model_;
+    // action_skeleton：ST-GCN（NTU-RGB+D 60）骨架动作；内嵌 yolo-pose 逐帧提关键点后组序
+    std::unique_ptr<modeldeploy::vision::action::ActionSkeleton> action_skeleton_model_;
+    std::unique_ptr<modeldeploy::vision::detection::UltralyticsPose> as_pose_model_;
     // hand：MediaPipe 手部 21 点关键点（输入为手掌裁剪/整帧，输出 objects[].keypoints）
     std::unique_ptr<modeldeploy::vision::hand::HandLandmark> hand_model_;
     // reid：行人检测（复用同任务 detection 条目）+ OSNet 嵌入（事件 objects[].embedding）
     std::unique_ptr<modeldeploy::vision::detection::UltralyticsDet> reid_det_model_;
     std::unique_ptr<modeldeploy::vision::reid::ReID> reid_model_;
+    // ── action 时序状态（仅 detect 线程访问）──
+    // 滚动帧缓冲：存「短边 256 的 packed BGR」副本以控内存；容量 2*T，均匀采样 T 帧成片段。
+    // 每 T 帧推理一次，期间复用上次结果（见 infer_action）。未就绪时发空结果（不产生事件）。
+    std::deque<modeldeploy::vision::ImageData> action_frames_;
+    int64_t action_since_run_ = 0;        // 距上次推理的入缓冲帧数（cadence）
+    int64_t action_run_count_ = 0;        // 实际推理次数（测试/可观测性）
+    bool action_has_result_ = false;
+    InferResult action_last_result_;
+    // ── action_skeleton 时序状态（仅 detect 线程访问）──
+    // 滚动骨架缓冲：每帧为展平的 M*V 个 Point3f（人优先）；容量 T，满且非全零时按 cadence 推理。
+    std::deque<std::vector<modeldeploy::vision::Point3f>> as_skeletons_;
+    int64_t as_since_run_ = 0;
+    int64_t as_run_count_ = 0;
+    bool as_has_result_ = false;
+    InferResult as_last_result_;
     std::unique_ptr<modeldeploy::vision::pipeline::PedestrianAttribute> pa_model_;
     std::unique_ptr<modeldeploy::vision::ocr::PaddleOCR> ocr_model_;
     std::unique_ptr<modeldeploy::vision::lpr::LprPipeline> lpr_model_;
@@ -173,6 +202,8 @@ private:
     bool infer_face_rec(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_hand(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_reid(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_action(const modeldeploy::vision::ImageData& image, InferResult* result);
+    bool infer_action_skeleton(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_pedestrian_attribute(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_ocr(const modeldeploy::vision::ImageData& image, InferResult* result);
     bool infer_lpr(const modeldeploy::vision::ImageData& image, InferResult* result);

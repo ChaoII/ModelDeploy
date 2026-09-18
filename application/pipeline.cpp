@@ -424,7 +424,8 @@ void Pipeline::detect_loop() {
                 // pose 框自带 keypoints（每人 17 点）、face_landmark 框自带 106 点、depth 框自带
                 // depth（米）、sem 框自带类别占比 attributes、face_rec 框自带 embedding（512-d
                 // L2 归一化）、hand 框自带 21 点 keypoints、reid 框自带 OSNet embedding，
-                // 随框进入事件；sam 框为 prompt_point 选中的单个 segment。
+                // action/action_skeleton 产出整帧框 + top-1 label + Top-K 类别分数（时序模型，
+                // 缓冲就绪后按 cadence 复用缓存结果），随框进入事件；sam 框为 prompt_point 选中的单个 segment。
                 // 空框结果不并入（不产生空事件）。
                 for (const auto& [name, r] : non_det) {
                     bool any_text = false;
@@ -439,7 +440,8 @@ void Pipeline::detect_loop() {
                          r.type == "face_landmark" || r.type == "doc" ||
                          r.type == "barcode" || r.type == "sam" ||
                          r.type == "face_rec" || r.type == "hand" ||
-                         r.type == "reid" ||
+                         r.type == "reid" || r.type == "action" ||
+                         r.type == "action_skeleton" ||
                          r.type == "classification");
                     if (r.attributes.empty() && !any_text && !has_boxes) continue;
                     for (const auto& b : r.boxes) boxes.push_back(b);

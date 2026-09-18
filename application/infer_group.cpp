@@ -177,8 +177,11 @@ bool InferGroup::run_models(
                 // ROI：非 detection 族（如人脸）按区域裁剪，几何结果按偏移回映射；classification/sem 无几何不做
                 // （sem 契约要求整帧对象 0,0,1,1，裁剪会破坏该契约）
                 const RoiRect rr = effective_roi(mc, frame);
+                // action/action_skeleton 与 classification/sem 同属「整帧对象」契约：ROI 裁剪会破坏
+                // 整帧框语义（且时序缓冲需全帧），故不裁剪。
                 const bool can_roi = rr.valid && frame.device() == modeldeploy::Device::CPU &&
-                                     mc.type != "classification" && mc.type != "sem";
+                                     mc.type != "classification" && mc.type != "sem" &&
+                                     mc.type != "action" && mc.type != "action_skeleton";
                 ImageData infer_frame = frame;
                 float ox = 0.f, oy = 0.f;
                 if (can_roi) {
