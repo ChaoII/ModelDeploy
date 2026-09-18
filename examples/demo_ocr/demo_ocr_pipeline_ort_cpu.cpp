@@ -21,14 +21,24 @@ int main() {
     opt.set_cpu_thread_num(4);
 
     // ---- 2. 加载模型（OCR：检测 + 方向分类 + 识别；词典统一 ppocrv6_tiny）----
-    const char* dict = "../../test_data/ppocrv6_tiny_dict.txt";
-    auto m = std::make_unique<modeldeploy::vision::ocr::PaddleOCR>("../../test_data/test_models/onnx/ocr/ppocrv6_tiny/det_infer.onnx", "../../test_data/test_models/onnx/ocr/ppocrv6_tiny/cls_infer.onnx", "../../test_data/test_models/onnx/ocr/ppocrv6_tiny/rec_infer.onnx", dict, opt);
-    if (!m->is_initialized()) { std::fprintf(stderr, "init failed\n"); return 1; }
-    m->set_rec_batch_size(8);
-    m->get_detector()->get_preprocessor().set_max_side_len(1440);
+    const char* dict = "../../test_data/test_models/onnx/dx_ocr/dx_dict.txt";
+    auto m = std::make_unique<modeldeploy::vision::ocr::PaddleOCR>(
+        "../../test_data/test_models/onnx/dx_ocr/det.onnx",
+        "",
+        "../../test_data/test_models/onnx/dx_ocr/rec.onnx", dict, opt);
+    if (!m->is_initialized()) {
+        std::fprintf(stderr, "init failed\n");
+        return 1;
+    }
+    // m->set_rec_batch_size(8);
+    // m->get_detector()->get_postprocessor().set_det_db_thresh(0.9);
+    m->get_detector()->get_postprocessor().set_det_db_box_thresh(0.7);
     // ---- 3. 读图 ----
-    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/ocr2.jpg");
-    if (im.empty()) { std::fprintf(stderr, "cannot read image\n"); return 1; }
+    auto im = modeldeploy::vision::ImageData::imread("../../test_data/test_images/sdd9.jpg");
+    if (im.empty()) {
+        std::fprintf(stderr, "cannot read image\n");
+        return 1;
+    }
 
     modeldeploy::vision::OCRResult res; // 推理结果
 
@@ -40,9 +50,9 @@ int main() {
 
     // ---- 5. 结果与可视化 ----
     modeldeploy::vision::dis_ocr(res);
-    auto vis = modeldeploy::vision::vis_ocr(im, res, kFont);
+    auto vis = modeldeploy::vision::vis_ocr(im, res, kFont, 26);
+    vis.imshow("123");
     (void)vis.imwrite("result_ocr_pipeline_ort_cpu.jpg");
     std::printf("done, %zu boxes\n", res.boxes.size());
     return 0;
-
 }

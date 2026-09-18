@@ -77,6 +77,40 @@ static class Program
         Console.WriteLine("visualized -> detection_annotated.jpg");
     }
 
+    static void TestDx()
+    {
+        using var det = new DetectionModel("best.onnx", CpuOrt());
+        using var image = VisionImage.Read("1.jpg");
+
+        // 演示参数 API：类型化 setter（编译期检查，杜绝字符串拼错）+ 参数名/类型自省
+        det.SetConfThreshold(0.4);
+        det.SetNmsThreshold(0.45);
+
+        // 纯推理：Prediction<T> 同时是可枚举的列表（读结果）
+        using var result = det.Predict(image);
+        Console.WriteLine($"detected {result.Count} objects");
+        foreach (var r in result)
+        {
+            Console.WriteLine($"  {r}");
+        }
+
+        var box = result[0].Box;
+        int x = (int)box.X;
+        int y = (int)box.Y;
+        int w = (int)box.Width;
+        int h = (int)box.Height;
+        
+        var recModel = new RecognizerModel("rec.onnx|dx_dict.txt", CpuOrt());
+        var imCrop = image.Crop(x, y, w, h);
+        using var rResult = recModel.Predict(imCrop);
+        Console.WriteLine(rResult.Count);
+        foreach (var r in rResult)
+        {
+            Console.WriteLine(r);
+        }
+        image.Show();
+    }
+
     static void TestClassification()
     {
         using var cls = new ClassificationModel(
@@ -131,12 +165,12 @@ static class Program
     static void TestPedestrianAttribute()
     {
         static RuntimeOption CpuOrt() =>
-            new RuntimeOption().UseOrt().SetDevice(Device.CPU).SetCpuThreads(4);
+            new RuntimeOption().UseOrt().SetDevice(Device.GPU).SetCpuThreads(4);
 
         // var opt = new RuntimeOption();
         // opt.UseOrt();
 
-        var dir = Path.Combine(TestDataPath, "test_models/onnx");
+        var dir = Path.Combine(TestDataPath, "test_models/onnx/zhgd");
         // 两参重载：det 模型路径 + 分类模型路径（内部拼成 capi 的 "det|cls"；onnx/engine/mnn 皆可）
         using var ped = new PedestrianAttributeModel(
             Path.Combine(dir, "zhgd_det.onnx"),
@@ -151,7 +185,12 @@ static class Program
         using var result = ped.Predict(image); // Prediction<AttributeResult>
         Console.WriteLine($"persons: {result.Count}");
         foreach (var r in result)
+        {
             Console.WriteLine($"  {r.Box} score={r.BoxScore:F3} attrs=[{string.Join(", ", r.AttrScores)}]");
+            var im = image.Crop((int)r.Box.X, (int)r.Box.Y, (int)r.Box.Width, (int)r.Box.Height);
+            im.Show();
+        }
+
         // 绘制：句柄直达 C++ vis_attr（框 + 属性文本），就地在 image 上画
 
         Dictionary<int, string> dict = new Dictionary<int, string>
@@ -198,8 +237,9 @@ static class Program
 
     static void Main(string[] args)
     {
+        TestDx();
         // TestDetection();
-        TestPedestrianAttribute();
+        // TestPedestrianAttribute();
         // TestImage();
         // TestClassification();
         // TestPose();
