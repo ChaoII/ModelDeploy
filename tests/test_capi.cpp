@@ -390,6 +390,74 @@ TEST_CASE("capi ocr setter batch + shape", "[model]") {
     md_model_destroy(ocr);
 }
 
+// OCR 独立 rec / cls：结果读取不得依赖 boxes。
+// 回归：md_result_count 曾对 OCR 返回 boxes.size()，而独立 rec 只填 text、独立 cls 只填 cls_scores，
+// 导致 count 恒为 0（C# RecognizerModel / OcrClassifierModel 读不到任何数据）。
+TEST_CASE("capi ocr rec/cls standalone result read", "[model]") {
+    const char* env = std::getenv("TEST_DATA_DIR");
+    std::string data_dir = env && *env ? std::string(env) + "/test_data" : "test_data";
+    const std::string ocr_dir = data_dir + "/test_models/onnx/ocr/ppocrv6_tiny";
+    const std::string cls = ocr_dir + "/cls_infer.onnx";
+    const std::string rec = ocr_dir + "/rec_infer.onnx";
+    const std::string dict = data_dir + "/ppocrv6_tiny_dict.txt";
+    const std::string imgf = data_dir + "/test_images/test_ocr_recognition.jpg";
+    if (!std::filesystem::exists(cls) || !std::filesystem::exists(rec) ||
+        !std::filesystem::exists(dict) || !std::filesystem::exists(imgf)) return;
+
+    MDOptionHandle opt = nullptr;
+    REQUIRE(md_option_create(&opt) == MD_OK);
+    md_option_set_backend(opt, MD_BK_ORT);
+    md_option_set_device(opt, MD_DEV_CPU, 0);
+
+    MDImageHandle img = nullptr;
+    REQUIRE(md_image_from_file(&img, imgf.c_str()) == MD_OK);
+
+    // 独立 rec：count == 1，且能读到 text / score
+    {
+        MDModelHandle m = nullptr;
+        const std::string joined = rec + "|" + dict;
+        REQUIRE(md_model_create(&m, MD_MODEL_OCR_REC, joined.c_str(), opt) == MD_OK);
+        MDResultHandle res = nullptr;
+        REQUIRE(md_model_predict(m, img, &res) == MD_OK);
+        MDResultKind kind = (MDResultKind)-1;
+        REQUIRE(md_result_kind(res, &kind) == MD_OK);
+        CHECK(kind == MD_RES_OCR);
+        size_t n = 0;
+        REQUIRE(md_result_count(res, &n) == MD_OK);
+        REQUIRE(n == 1);
+        const int* quad = nullptr;
+        const char* text = nullptr;
+        float score = 0.f;
+        REQUIRE(md_result_ocr(res, 0, &quad, &text, &score) == MD_OK);
+        REQUIRE(quad != nullptr);
+        REQUIRE(text != nullptr);
+        CHECK(std::string(text).size() > 0);
+        CHECK(score > 0.f);
+        md_result_destroy(res);
+        md_model_destroy(m);
+    }
+
+    // 独立 cls：count == 1，且能读到 label / score
+    {
+        MDModelHandle m = nullptr;
+        REQUIRE(md_model_create(&m, MD_MODEL_OCR_CLS, cls.c_str(), opt) == MD_OK);
+        MDResultHandle res = nullptr;
+        REQUIRE(md_model_predict(m, img, &res) == MD_OK);
+        size_t n = 0;
+        REQUIRE(md_result_count(res, &n) == MD_OK);
+        REQUIRE(n == 1);
+        int label = -1;
+        float score = 0.f;
+        REQUIRE(md_result_ocr_cls(res, 0, &label, &score) == MD_OK);
+        CHECK(label >= 0);
+        md_result_destroy(res);
+        md_model_destroy(m);
+    }
+
+    md_image_destroy(img);
+    md_option_destroy(opt);
+}
+
 // 非对应 kind 上的 size 路由不应崩溃：FACE_REC_PIPELINE 缺模型时跳过路由测试仅需 det 类已覆盖，
 // 这里验证 UNSUPPORTED 分支（nullptr → MODEL_INIT）
 TEST_CASE("capi ocr batch size rejects wrong kind", "[capi]") {

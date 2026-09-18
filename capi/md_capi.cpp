@@ -1908,9 +1908,16 @@ MDStatus md_result_count(MDResultHandle h, size_t* out) {
     // 单图 (SingleResult) 返回 value.boxes 数；批量 (ResultData) 与 md_result_ocr 一致读第 0 图的行数。
     if (rh->kind == MD_RES_OCR) {
         if (auto* s = dynamic_cast<SingleResult<OCRResult>*>(static_cast<ResultDataBase*>(rh->data))) {
-            *out = s->value.boxes.size();
+            const auto& v = s->value;
+            // det/全流程以 boxes 为行；独立 rec 只有 text；独立 cls 只有 cls_scores。
+            *out = std::max({v.boxes.size(), v.text.size(), v.cls_scores.size()});
         } else if (auto* d = dynamic_cast<ResultData<OCRResult>*>(static_cast<ResultDataBase*>(rh->data))) {
-            *out = d->v.empty() ? 0 : d->v[0].boxes.size();
+            if (d->v.empty()) {
+                *out = 0;
+            } else {
+                const auto& v = d->v[0];
+                *out = std::max({v.boxes.size(), v.text.size(), v.cls_scores.size()});
+            }
         } else {
             *out = 0;
         }
@@ -3281,8 +3288,10 @@ MDStatus md_result_ocr(MDResultHandle h, size_t i, const int** quad, const char*
     } else {
         return MD_ERR_INVALID_ARGUMENT;
     }
-    if (i >= value->boxes.size()) return MD_ERR_INVALID_ARGUMENT;
-    if (quad) *quad = value->boxes[i].data();
+    // 独立 rec 无 boxes（只有 text），行数按 max(boxes, text) 判定；无 boxes 时 quad 返回零值
+    if (i >= std::max(value->boxes.size(), value->text.size())) return MD_ERR_INVALID_ARGUMENT;
+    static const int kZeroQuad[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    if (quad) *quad = i < value->boxes.size() ? value->boxes[i].data() : kZeroQuad;
     if (text) *text = i < value->text.size() ? value->text[i].c_str() : "";
     if (score) *score = i < value->rec_scores.size() ? value->rec_scores[i] : 0.f;
     return MD_OK;
@@ -3851,8 +3860,10 @@ MDStatus md_result_ocr_batch(MDResultHandle h, size_t img_i, size_t line_j, cons
     auto* d = dynamic_cast<ResultData<OCRResult>*>(static_cast<ResultDataBase*>(rh->data));
     if (!d || img_i >= d->v.size()) return MD_ERR_INVALID_ARGUMENT;
     const OCRResult& value = d->v[img_i];
-    if (line_j >= value.boxes.size()) return MD_ERR_INVALID_ARGUMENT;
-    if (quad) *quad = value.boxes[line_j].data();
+    // 与单图版一致：独立 rec 无 boxes，按 max(boxes, text) 判定，quad 零值兜底
+    if (line_j >= std::max(value.boxes.size(), value.text.size())) return MD_ERR_INVALID_ARGUMENT;
+    static const int kZeroQuadBatch[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    if (quad) *quad = line_j < value.boxes.size() ? value.boxes[line_j].data() : kZeroQuadBatch;
     if (text) *text = line_j < value.text.size() ? value.text[line_j].c_str() : "";
     if (score) *score = line_j < value.rec_scores.size() ? value.rec_scores[line_j] : 0.f;
     return MD_OK;

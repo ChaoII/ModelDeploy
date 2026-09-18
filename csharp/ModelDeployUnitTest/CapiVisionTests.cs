@@ -329,6 +329,26 @@ public class CapiVisionTests
         Assert.That(results[0].Text, Is.Not.Empty);
     }
 
+    // 独立 rec 模型（不经过 det）：结果读取不得依赖 boxes。
+    // 回归：md_result_count 曾对 OCR 返回 boxes.size()，独立 rec 无 boxes → Count 恒为 0。
+    [Test]
+    public void OcrRecognizer_Standalone_Predict_ReturnsText()
+    {
+        var dir = Path.Combine(ModelRoot, "ocr", "ppocrv6_tiny");
+        var recPath = Path.Combine(dir, "rec_infer.onnx");
+        var dict = Path.Combine(GetTestDataDir(), "test_data", "ppocrv6_tiny_dict.txt");
+        var img = Path.Combine(ImageRoot, "test_ocr_recognition.jpg");
+        if (!Has(recPath) || !Has(dict) || !Has(img)) Assert.Ignore("model/image not found");
+
+        using var vi = VisionImage.Read(img);
+        using var rec = new RecognizerModel(string.Join("|", recPath, dict), CpuOrt());
+        var r = rec.Predict(vi);
+
+        Assert.That(r.Count, Is.EqualTo(1));
+        Assert.That(r[0].Text, Is.Not.Empty);
+        Assert.That(r[0].Score, Is.GreaterThan(0f));
+    }
+
     // ==================== Draw ====================
 
     [Test]
