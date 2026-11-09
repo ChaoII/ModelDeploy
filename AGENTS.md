@@ -145,6 +145,11 @@ CPU 发布作业 `BUILD_TESTS=OFF`，测试覆盖由 `cpu_glibc228` / GPU / aarc
   容器内编译，工作流 `.github/workflows/build_deps.yml`（`workflow_dispatch` 或推 `ci/deps-*`
   分支触发）。x64 装 `lib/`、aarch64 装 `lib64/`，与 `cmake/opencv.cmake` 查找路径对应；
   Windows 包仍是 5.0。
+- **Linux GPU ORT**：按 CUDA 大版本分包 `onnxruntime_linux_x64_gpu_1_29_1_cuda{12,13}.zip`
+  （csukuangfj patched 构建）。cu12 包依赖 `libcublas.so.12`、cu13 包依赖 `libcublas.so.13`，
+  `cmake/onnxruntime.cmake` 用 `CUDAToolkit_VERSION_MAJOR` 选包，不能混用。Windows GPU 仍只有
+  cu12 包（`providers_cuda.dll` 依赖 `cublas64_12.dll`），要出 Windows cu13 产物需另做 Windows
+  ORT GPU 包。
 
 **runner 一律 pin 具体镜像，禁用 `-latest`**：2026-11 起 `ubuntu-latest` 已迁到 **Ubuntu 26.04**
 （glibc 2.41+），`windows-latest` 已是 VS2026；用 `-latest` 会让产物的 glibc / MSVC 底线和
