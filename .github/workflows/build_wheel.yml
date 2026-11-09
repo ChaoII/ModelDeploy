@@ -24,22 +24,22 @@ jobs:
         # 把 platform 放 include 里会让后一条覆盖前一条，导致 linux 作业静默消失。
         include:
           - name: ubuntu24.04-gcc13
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             python-version: "3.12"
             c_compiler: gcc
             cpp_compiler: g++
           - name: ubuntu24.04-gcc13
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             python-version: "3.13"
             c_compiler: gcc
             cpp_compiler: g++
           - name: windows2025-vs2026
-            runner: windows-latest
+            runner: windows-2025-vs2026
             python-version: "3.12"
             c_compiler: cl
             cpp_compiler: cl
           - name: windows2025-vs2026
-            runner: windows-latest
+            runner: windows-2025-vs2026
             python-version: "3.13"
             c_compiler: cl
             cpp_compiler: cl
@@ -87,7 +87,7 @@ jobs:
   # 平台标签为 manylinux_2_28_x86_64，可装到 Ubuntu 20.04+/Debian 10+/RHEL 8+ 等。
   manylinux:
     name: wheel (manylinux2.28-gcc14 / cp312-cp313)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
 
     steps:

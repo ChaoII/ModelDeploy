@@ -133,6 +133,17 @@ Linux 兼容性基线：**glibc 2.28**（`manylinux_2_28` 容器，GCC 14）与 
 CPU 发布作业 `BUILD_TESTS=OFF`，测试覆盖由 `cpu_glibc228` / GPU / aarch64 作业承担；
 这些测试跑 `~[opencl]~[vulkan]~[gpu]~[regression]`，排除 GCC 上已知失败的 baseline_compare。
 
+**runner 一律 pin 具体镜像，禁用 `-latest`**：2026-11 起 `ubuntu-latest` 已迁到 **Ubuntu 26.04**
+（glibc 2.41+），`windows-latest` 已是 VS2026；用 `-latest` 会让产物的 glibc / MSVC 底线和
+产物名一起漂移。当前 pin：`ubuntu-24.04`、`ubuntu-24.04-arm`、`windows-2022`、
+`windows-2025-vs2026`。CUDA 12.8 的 `crt/host_config.h` 拒绝 MSVC 19.5x，所以 GPU 侧只有
+v143；要出 VS2026/GPU 产物必须升到 CUDA 13.x。
+
+**已知：modelscope 上的 `test_data.zip` 目录结构落后于代码**——包内是 `test_data/test_models/<模型>`
+扁平结构且缺 `qr_sample.png`，而代码期望 `test_data/test_models/{onnx,mnn,ncnn,trt,sophgo}/...`。
+结果是大量模型用例在 `if (!fs::exists(...)) return;` 处静默跳过（CI 绿但覆盖很浅）。
+测试数据补齐前，模型类用例失败优先怀疑此结构不匹配，而不是代码回归。
+
 ## GitHub 凭据
 
 - GitHub 访问令牌（供 `gh` / REST API / Chrono II 调试 Actions 用）以纯文本存放在 git 凭据文件：

@@ -18,6 +18,9 @@ env:
 
 jobs:
   # ==================== CPU 构建（产物最低运行环境由 job 名标出） ====================
+  # runner 一律显式 pin 具体镜像，**不要用 -latest**：2026-11 起 `ubuntu-latest` 已迁移到
+  # Ubuntu 26.04（glibc 2.41+），`windows-latest` 也已变成 VS2026——用 -latest 会让产物
+  # 的 glibc / MSVC 底线在毫无察觉的情况下漂移，产物名也会变成假话。
   #   ubuntu24.04-gcc13.3  → glibc >= 2.39
   #   windows2025-vs2026   → VC++ 2015-2022 Redist >= 14.51（MSVC 14.51 / v145）
   #   windows2022-vs2022   → VC++ 2015-2022 Redist >= 14.44（MSVC 14.44 / v143）
@@ -32,7 +35,7 @@ jobs:
       matrix:
         include:
           - name: ubuntu24.04-gcc13.3
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             toolchain: ubuntu24.04-gcc13
             pkg_os: linux-x64
             c_compiler: gcc
@@ -41,7 +44,7 @@ jobs:
             ext: tar.gz
 
           - name: windows2025-vs2026
-            runner: windows-latest
+            runner: windows-2025-vs2026
             toolchain: windows2025-vs2026
             pkg_os: win-x64
             c_compiler: cl
@@ -147,7 +150,7 @@ jobs:
   # 容器构建与 runner 本机 glibc 无关，故 ubuntu-22.04 runner 下架也不受影响。
   cpu_glibc228:
     name: CPU (manylinux2.28-gcc14 / glibc 2.28)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64:2026.09.05-1
@@ -172,11 +175,11 @@ jobs:
       - name: Toolchain info
         shell: bash
         run: |
-          set -euxo pipefail
-          ldd --version | head -1
-          gcc --version | head -1
-          g++ --version | head -1
-          cmake --version | head -1
+          set -eo pipefail
+          ldd --version | sed -n 1p
+          gcc --version | sed -n 1p
+          g++ --version | sed -n 1p
+          cmake --version | sed -n 1p
 
       - name: Download test data
         shell: bash
@@ -264,7 +267,7 @@ jobs:
       matrix:
         include:
           - name: ubuntu24.04-gcc13.3-cuda12.8
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             toolchain: ubuntu24.04-gcc13-cuda12.8
             pkg_os: linux-x64-gpu
             c_compiler: gcc

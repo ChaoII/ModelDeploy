@@ -138,12 +138,12 @@ jobs:
       - name: Toolchain info
         shell: bash
         run: |
-          set -euxo pipefail
+          set -eo pipefail
           uname -m
-          gcc --version | head -1
-          g++ --version | head -1
-          ldd --version | head -1
-          cmake --version | head -1
+          gcc --version | sed -n 1p
+          g++ --version | sed -n 1p
+          ldd --version | sed -n 1p
+          cmake --version | sed -n 1p
 
       - name: Download test data
         shell: bash
