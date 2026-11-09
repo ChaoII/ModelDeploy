@@ -128,10 +128,23 @@ GitHub Actions 工作流（job 名与产物名都带 OS + 工具链标记，便�
 
 Linux 兼容性基线：**glibc 2.28**（`manylinux_2_28` 容器，GCC 14）与 **glibc 2.39**
 （Ubuntu 24.04，GCC 13）并存；Windows 基线为 **MSVC 14.44（VS2022 / v143）** 与
-**14.51（VS2026）** 并存。`ilammy/msvc-dev-cmd` 的 `toolset` 是**前缀匹配**：写 `14.40`
+**14.51（VS2026）** 并存。实测（第五轮 CI）两条 Linux 兼容产物均为
+**`GLIBC_2.27` / `GLIBCXX_3.4.22`** 上限，可运行于 Ubuntu 18.04+/Debian 10+/RHEL 8+。
+`ilammy/msvc-dev-cmd` 的 `toolset` 是**前缀匹配**：写 `14.40`
 会命中镜像里并存的 `14.44`（日志可验 `VCToolsVersion`），务必写实际存在的精确版本。
 CPU 发布作业 `BUILD_TESTS=OFF`，测试覆盖由 `cpu_glibc228` / GPU / aarch64 作业承担；
 这些测试跑 `~[opencl]~[vulkan]~[gpu]~[regression]`，排除 GCC 上已知失败的 baseline_compare。
+
+依赖包（`ChaoII0987/ModelDeploy_cmake_deps`）：
+
+- **Linux ORT**：用 `csukuangfj/onnxruntime-libs` 的 **1.29.1 `static_lib-glibc2_28`** 包
+  （`onnxruntime_linux_{x64,aarch64}_static_1_29_1_glibc2_28.zip`）。自建包在 Ubuntu 22/24 编，
+  会给 `.so` 引入 `GLIBC_2.35+` / `__libc_single_threaded` 等符号，glibc 2.28 目标机链接即失败。
+  Windows 与 Linux GPU 包保持自建不变。
+- **Linux OpenCV**：**5.1.0 静态包**，由 `tools/deps/build_opencv_static.sh` 在 `manylinux_2_28`
+  容器内编译，工作流 `.github/workflows/build_deps.yml`（`workflow_dispatch` 或推 `ci/deps-*`
+  分支触发）。x64 装 `lib/`、aarch64 装 `lib64/`，与 `cmake/opencv.cmake` 查找路径对应；
+  Windows 包仍是 5.0。
 
 **runner 一律 pin 具体镜像，禁用 `-latest`**：2026-11 起 `ubuntu-latest` 已迁到 **Ubuntu 26.04**
 （glibc 2.41+），`windows-latest` 已是 VS2026；用 `-latest` 会让产物的 glibc / MSVC 底线和
