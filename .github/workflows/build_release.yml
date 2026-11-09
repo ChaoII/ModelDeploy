@@ -266,10 +266,10 @@ jobs:
           generate_release_notes: true
 
   # ==================== GPU 构建（仅编译 + 无设备 smoke） ====================
-  # CUDA 12.8：与本地开发机（RTX 4060 Ti / CUDA 12.8）及预编译 onnxruntime GPU 包
-  # （cmake/onnxruntime.cmake 固定 1.29）保持同一大版本，避免 CI 与产物的 CUDA 大版本错配。
-  # 注意：CUDA 12.8 的 crt/host_config.h 明确拒绝 MSVC 19.5x（VS2026），所以 GPU 侧
-  # 只保留 windows-2022 + v143（14.44）。若以后要出 VS2026/GPU 产物，必须把 CUDA 升到 13.x。
+  # CUDA 12/13 双版本：onnxruntime GPU 包按 CUDA 大版本区分
+  # （cu12 包依赖 libcublas.so.12，cu13 包依赖 libcublas.so.13，见 cmake/onnxruntime.cmake）。
+  # CUDA 12.8 的 crt/host_config.h 拒绝 MSVC 19.5x（VS2026），所以 Windows 侧只保留
+  # windows-2022 + v143（14.44）；Linux 无此限制，12.8 与 13.2 都出。
   gpu:
     name: GPU (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
@@ -281,7 +281,20 @@ jobs:
         include:
           - name: ubuntu24.04-gcc13.3-cuda12.8
             runner: ubuntu-24.04
+            cuda: "12.8.1"
+            cuda_major: "12"
             toolchain: ubuntu24.04-gcc13-cuda12.8
+            pkg_os: linux-x64-gpu
+            c_compiler: gcc
+            cpp_compiler: g++
+            toolset: ""
+            ext: tar.gz
+
+          - name: ubuntu24.04-gcc13.3-cuda13.2
+            runner: ubuntu-24.04
+            cuda: "13.2.0"
+            cuda_major: "13"
+            toolchain: ubuntu24.04-gcc13-cuda13.2
             pkg_os: linux-x64-gpu
             c_compiler: gcc
             cpp_compiler: g++
@@ -290,6 +303,8 @@ jobs:
 
           - name: windows2022-vs2022-cuda12.8
             runner: windows-2022
+            cuda: "12.8.1"
+            cuda_major: "12"
             toolchain: windows2022-vs2022-cuda12.8
             pkg_os: win-x64-gpu
             c_compiler: cl
@@ -341,10 +356,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxml2t64 || sudo apt-get install -y libxml2
 
-      - name: Setup CUDA 12.8
+      - name: Setup CUDA ${{ matrix.cuda }}
         uses: Jimver/cuda-toolkit@master
         with:
-          cuda: "12.8.1"
+          cuda: ${{ matrix.cuda }}
 
       - name: Download test data
         shell: bash
@@ -388,8 +403,8 @@ jobs:
           done
           echo "--- installed CUDA runtime ---"
           ls -1 /usr/local/cuda*/lib64/libcudart.so* 2>/dev/null | head -5
-          if ! ldd build/_deps/onnxruntime-src/lib/*.so* 2>/dev/null | grep -q 'libcudart.so.12'; then
-            echo "::warning::未在 onnxruntime 动态库里发现 libcudart.so.12 依赖，预编译包可能按其它 CUDA 大版本构建"
+          if ! ldd build/_deps/onnxruntime-src/lib/*.so* 2>/dev/null | grep -q 'libcudart.so.${{ matrix.cuda_major }}'; then
+            echo "::warning::未在 onnxruntime 动态库里发现 libcudart.so.${{ matrix.cuda_major }} 依赖，预编译包可能按其它 CUDA 大版本构建"
           fi
 
       - name: Probe ORT CUDA runtime dependency (Windows)
@@ -403,8 +418,8 @@ jobs:
             dumpbin -dependents "$DLL" | grep -Ei 'cudart|cudnn|cublas'
           fi
           ls -1 "$CUDA_PATH"/bin/cudart64_*.dll 2>/dev/null || true
-          if ! dumpbin -dependents "$DLL" 2>/dev/null | grep -qi 'cudart64_12'; then
-            echo "::warning::未在 onnxruntime_providers_cuda 依赖中发现 cudart64_12，预编译包可能按其它 CUDA 大版本构建"
+          if ! dumpbin -dependents "$DLL" 2>/dev/null | grep -qi 'cudart64_${{ matrix.cuda_major }}'; then
+            echo "::warning::未在 onnxruntime_providers_cuda 依赖中发现 cudart64_${{ matrix.cuda_major }}，预编译包可能按其它 CUDA 大版本构建"
           fi
 
       - name: GPU smoke (0 failures, graceful skip on device-less runner)

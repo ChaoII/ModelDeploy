@@ -7,7 +7,10 @@ set(onnxruntime_win_x64_gpu_1_29_0_FILE_NAME "onnxruntime_win_x64_gpu_1_29_0.zip
 # Linux 侧改用 csukuangfj/onnxruntime-libs 的 glibc2.28 静态包（AlmaLinux 8 用户空间构建）：
 # 自建包是在 Ubuntu 22.04/24.04 上编的，会引入 GLIBC_2.35+ 符号，glibc 2.28 目标机无法加载。
 set(onnxruntime_linux_x64_static_1_29_1_glibc2_28_FILE_NAME "onnxruntime_linux_x64_static_1_29_1_glibc2_28.zip")
-set(onnxruntime_linux_x64_gpu_1_29_0_FILE_NAME "onnxruntime_linux_x64_gpu_1_29_0.zip")
+# GPU 包按 CUDA 大版本区分（csukuangfj/onnxruntime-libs 的 patched 构建）：
+# cu12 包依赖 libcublas.so.12，cu13 包依赖 libcublas.so.13，必须与 CUDAToolkit 大版本匹配
+set(onnxruntime_linux_x64_gpu_1_29_1_cuda12_FILE_NAME "onnxruntime_linux_x64_gpu_1_29_1_cuda12.zip")
+set(onnxruntime_linux_x64_gpu_1_29_1_cuda13_FILE_NAME "onnxruntime_linux_x64_gpu_1_29_1_cuda13.zip")
 set(onnxruntime_linux_aarch64_static_1_29_1_glibc2_28_FILE_NAME "onnxruntime_linux_aarch64_static_1_29_1_glibc2_28.zip")
 
 
@@ -27,9 +30,16 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     if (WITH_GPU)
         if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-            set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_x64_gpu_1_29_0_FILE_NAME})
-            set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
-            set(ONNXRUNTIME_HASH "SHA256=0a65719e8e8d2f5e12ab72b43282196734f61655deda9c9cb8b9666e0ac337fe")
+            # 按 CUDAToolkit 大版本选 GPU 包（CMakeLists 在 include 本文件前已 find_package(CUDAToolkit)）
+            if (CUDA_MAJOR_VERSION GREATER_EQUAL 13)
+                set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_x64_gpu_1_29_1_cuda13_FILE_NAME})
+                set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+                set(ONNXRUNTIME_HASH "SHA256=fccae695cf6b74ff8d10d78c6fb88c1c2f92074ea77a8d95218faf9e52fb7cda")
+            else ()
+                set(ONNXRUNTIME_FILE_NAME ${onnxruntime_linux_x64_gpu_1_29_1_cuda12_FILE_NAME})
+                set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+                set(ONNXRUNTIME_HASH "SHA256=2faff427f1dbb0174726417ec2ffa39058182a0b653341ee373f8aaa9958f6f3")
+            endif ()
         else ()
             message(FATAL_ERROR "Unsupported system arch : ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} for GPU. Please set -DWITH_GPU=OFF")
         endif ()
