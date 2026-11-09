@@ -16,25 +16,22 @@ concurrency:
 
 jobs:
   # ==================== aarch64 wheel ====================
-  # 在 ubuntu-latest 上用 cibuildwheel 构建 Linux aarch64 的 Python wheel。
-  # cibuildwheel 内部在 manylinux_aarch64 容器中构建（该 ABI 无原生 runner，
-  # 需 QEMU 模拟运行构建环境——此为打 aarch64 wheel 的标准做法）。
-  # 构建经 scikit-build-core 走 CMake，CMAKE_SYSTEM_PROCESSOR=aarch64，
-  # 自动拉取 aarch64 预编译依赖（onnxruntime/MNN/ncnn/OpenCV）。
+  # 之前跑在 ubuntu-latest + QEMU 上（模拟执行 aarch64 构建环境），实测每次都撞 6 小时
+  # job 上限被取消，从未产出过 wheel。现改为 GitHub 的 arm64 托管 runner 原生执行：
+  # cibuildwheel 仍在 manylinux_2_28_aarch64 容器内构建（保证 glibc 2.28 兼容），
+  # 但容器是 arm64 原生运行，无需 QEMU。
   build:
-    runs-on: ubuntu-latest
+    name: wheels (manylinux2.28-aarch64 / cp312-cp313)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
-      - name: Set up QEMU (for aarch64 build env)
-        uses: docker/setup-qemu-action@v3
-
-      - name: Install dependencies
+      - name: Toolchain info
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build libssl-dev
+          uname -m
+          docker --version
 
       - name: Build aarch64 wheels
         # 须 cibuildwheel >= v2.22.0：v2.21.x 在 before_all 硬编码容器基础 python
@@ -52,12 +49,15 @@ jobs:
           # （aarch64 亦无 manylinux2014 的 numpy 预编译轮）→ 改用 manylinux_2_28（glibc≥2.28，
           # GCC 新，numpy/onnxruntime/opencv 均有预编译轮）。wheel 平台标签变为 manylinux_2_28_aarch64。
           CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64:2026.09.05-1
+          # 仓库要求 CMake >= 3.27；为每个 cp3xx 构建环境装一份 pip cmake，避免镜像自带版本过旧
+          CIBW_BEFORE_BUILD_LINUX: >-
+            python -m pip install --no-cache-dir "cmake==3.31.6"
           CIBW_BEFORE_ALL_LINUX: >-
             (yum install -y openssl-devel || dnf install -y openssl-devel) || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-aarch64
+          name: wheels-linux-aarch64-manylinux2.28
           path: dist/*.whl
           retention-days: 7

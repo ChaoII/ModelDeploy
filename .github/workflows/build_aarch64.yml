@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: aarch64-${{ github.ref }}
@@ -16,60 +16,192 @@ concurrency:
 
 env:
   PROJECT_NAME: "ModelDeploy"
+  TEST_DATA_URL: "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip"
 
 jobs:
-  # ==================== aarch64 交叉编译 ====================
-  # GitHub runner 均为 x86_64。此处用 aarch64 交叉工具链把 SDK 交叉编译为
-  # Linux aarch64 产物（不经 QEMU / arm64 容器，不实际以 arm64 运行）。
-  # 依赖（onnxruntime / MNN / ncnn / OpenCV）均有 aarch64 预编译静态包，
-  # CMake FetchContent 按 toolchain 的 CMAKE_SYSTEM_PROCESSOR=aarch64 自动下载。
-  # 交叉编译无法在 x86 上运行 aarch64 测试，故本任务只做 配置 + 编译 + 打包。
-  cross-build:
-    name: cross-build (x86_64 -> aarch64)
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+  # ==================== aarch64 原生构建（glibc 2.39 基线） ====================
+  # GitHub 提供 arm64 托管 runner（公有仓库免费），不再需要 x86→aarch64 交叉编译。
+  # 原生构建的额外好处：能真正编译测试二进制并运行，交叉编译做不到。
+  native:
+    name: aarch64 (ubuntu24.04-gcc13 / glibc 2.39)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
-      - name: Install cross toolchain
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-aarch64-linux-gnu cmake ninja-build
+          sudo apt-get install -y cmake ninja-build libssl-dev
 
-      - name: Write aarch64 toolchain file
+      - name: Toolchain info
         shell: bash
         run: |
-          cat > "$RUNNER_TEMP/aarch64-toolchain.cmake" <<'EOF'
-          set(CMAKE_SYSTEM_NAME Linux)
-          set(CMAKE_SYSTEM_PROCESSOR aarch64)
-          set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-          set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-          set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
-          set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-          set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-          set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-          EOF
+          uname -m
+          gcc --version | head -1
+          g++ --version | head -1
+          ldd --version | head -1
+          cmake --version | head -1
 
-      - name: Configure (cross)
+      - name: Download test data
+        shell: bash
+        run: |
+          curl -L -o test_data.zip "$TEST_DATA_URL"
+          unzip -q test_data.zip
+
+      - name: Configure
         run: >
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/aarch64-toolchain.cmake
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_CXX_COMPILER=g++
           -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=ON
-          -DBUILD_PYTHON=OFF
+          -DBUILD_TESTS=ON
           -DWITH_GPU=OFF
 
       - name: Build
         run: cmake --build build
 
-      - name: Install
-        run: cmake --install build --prefix install
+      # 完整 ctest 会撞上已知的 baseline_compare 平台差异（MSVC 基线 vs GCC FMA 收缩，
+      # 见 AGENTS.md），故排除 [regression]；aarch64 runner 无 GPU，同时排除 [gpu]。
+      - name: Test
+        shell: bash
+        working-directory: build
+        env:
+          TEST_DATA_DIR: ${{ github.workspace }}
+        run: |
+          set -euxo pipefail
+          ./bin/test_modeldeploy "~[opencl]~[vulkan]~[gpu]~[regression]"
 
-      - name: Upload artifact
+      - name: Install + verify glibc floor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --install build --prefix install
+          MAX=$(objdump -T install/lib/*.so* | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sed 's/^GLIBC_//' | sort -uV | tail -1)
+          echo "最高 glibc 符号需求: ${MAX:-unknown}"
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          VERSION="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('dev_{0}', github.run_id) }}"
+          NAME="${PROJECT_NAME}_${VERSION}_linux-aarch64_ubuntu24.04-gcc13"
+          echo "PKG=${NAME}.tar.gz" >> $GITHUB_ENV
+          tar -czf "${NAME}.tar.gz" -C install .
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PROJECT_NAME }}-linux-aarch64
-          path: install
+          name: ${{ env.PKG }}
+          path: ${{ env.PKG }}
           retention-days: 7
+
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.PKG }}
+          generate_release_notes: true
+
+  # ==================== aarch64 兼容构建（glibc 2.28 基线） ====================
+  # 与 x64 的 cpu_glibc228 对齐：manylinux_2_28_aarch64 容器 + arm64 原生 runner
+  # （容器原生执行，不经 QEMU），产物覆盖 Ubuntu 20.04+/Debian 10+/RHEL 8+ 的 arm64 系统。
+  glibc228:
+    name: aarch64 (manylinux2.28-gcc14 / glibc 2.28)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    container:
+      image: quay.io/pypa/manylinux_2_28_aarch64:2026.09.05-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        shell: bash
+        run: |
+          set -euxo pipefail
+          dnf install -y openssl-devel unzip tar gzip which || yum install -y openssl-devel unzip tar gzip which
+          # 仓库要求 CMake >= 3.27；AlmaLinux 8 自带版本过旧，用 pip 装 3.31
+          /opt/python/cp312-cp312/bin/python -m pip install --no-cache-dir "cmake==3.31.6" ninja
+          echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
+          # manylinux_2_28 的 GCC 14 通过 gcc-toolset 提供（不同镜像版本号可能变化，取最高者）
+          TOOLSET=$(ls -d /opt/rh/gcc-toolset-*/root/usr/bin 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "${TOOLSET:-}" ]; then
+            echo "$TOOLSET" >> "$GITHUB_PATH"
+          fi
+
+      - name: Toolchain info
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -m
+          gcc --version | head -1
+          g++ --version | head -1
+          ldd --version | head -1
+          cmake --version | head -1
+
+      - name: Download test data
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L -o test_data.zip "$TEST_DATA_URL"
+          unzip -q test_data.zip
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_CXX_COMPILER=g++
+          -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=ON
+          -DBUILD_TESTS=ON
+          -DWITH_GPU=OFF
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        shell: bash
+        working-directory: build
+        env:
+          TEST_DATA_DIR: ${{ github.workspace }}
+        run: |
+          set -euxo pipefail
+          ./bin/test_modeldeploy "~[opencl]~[vulkan]~[gpu]~[regression]"
+
+      - name: Install + verify glibc floor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --install build --prefix install
+          MAX=$(objdump -T install/lib/*.so* | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sed 's/^GLIBC_//' | sort -uV | tail -1)
+          echo "最高 glibc 符号需求: ${MAX:-unknown}"
+          if [ -n "$MAX" ] && [ "$(printf '%s\n2.28\n' "$MAX" | sort -V | tail -1)" != "2.28" ]; then
+            echo "::error::产物要求 glibc $MAX，高于目标 2.28（依赖包可能由更新的 glibc 构建）"
+            exit 1
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          VERSION="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('dev_{0}', github.run_id) }}"
+          NAME="${PROJECT_NAME}_${VERSION}_linux-aarch64_glibc2.28-gcc14"
+          echo "PKG=${NAME}.tar.gz" >> $GITHUB_ENV
+          tar -czf "${NAME}.tar.gz" -C install .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PKG }}
+          path: ${{ env.PKG }}
+          retention-days: 7
+
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.PKG }}
+          generate_release_notes: true

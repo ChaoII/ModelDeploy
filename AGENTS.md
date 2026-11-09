@@ -102,15 +102,36 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 - **ncnn 后端**：`cmake/ncnn.cmake` 按平台（Win-x64 / Linux-x64 / Linux-aarch64）从 modelscope 自动下载预编译静态包（含 ncnn + glslang 与各自 CMake config，`find_package(ncnn)`/`find_package(glslang)` 直接可用）；不支持平台配置时 fail-fast。MNN 同理（`cmake/mnn.cmake`，单库静态包，无独立 CUDA 库）。
 - **Linux rpath**：`$ORIGIN`；macOS：`@loader_path` —— SDK 运行时无需设置 `LD_LIBRARY_PATH`。
 - **NVIDIA Jetson**：通过 `/etc/nv_tegra_release` 自动检测；设置架构标志并强制 `WITH_GPU=ON`、`ENABLE_TRT=ON`，需要 TBB。
-- **C++17 必需**；第三方依赖（pybind11、Catch2）已捆绑在 `third_party/` 中。
+- **C++20 必需**（根 `CMakeLists.txt` 设 `CMAKE_CXX_STANDARD 20`，但未用 `std::format`/`std::ranges`/`std::span`，GCC 11+/MSVC 19.29+ 理论上可编，CI 用 GCC 13/14 与 MSVC 14.44/14.51）；第三方依赖（pybind11、Catch2）已捆绑在 `third_party/` 中。
 - **baseline_compare 已知平台差异（不修）**：`tests/baseline_compare.cpp` 的 ORT 端到端/预处理护栏基线按 MSVC 生成。GCC/Linux 构建因 `-O3 -mavx2 -mfma` 的 FMA 收缩，使 `utils::cal_letter_box_param` 的 `pad_h` 比 80.0 高 1 ULP（80.000007629）、`pad_w` 得 7.6e-6，随后 fused 预处理核（`src_yf<0`/`src_xf<0` 严格判断）把首行内容/左缘列误写为 pad → 输入张量逐像元差最大 0.557，翻转 logit≈阈值的临界检测（如 yolo26n instance[3] score 0.303 vs 0.564）。已确认与 onnxruntime 打包/MNN/ncnn 下载式接入**无关**（同机 i7-12700 双平台同走 AVX2 核），属预存在缺陷、生产影响趋近于零，故不修。CI 若在 GCC 跑 baseline_compare 会持续失败，需在 CI 平台重新生成基线。
 
 ## CI 工作流
 - **Sophgo TPU 测试（触发词“在 sophgo 上测试”）**：用户要求算能 TPU 交叉编译 + 部署测试时，纯 Sophgo 构建用 `ENABLE_SOPHGO=ON` + **`ENABLE_ORT=OFF`**（不依赖动态 onnxruntime）；在 `172.168.100.243` 的 `tpuc_dev` 容器（`/workspace`）内构建，产物经 `.243` 直传 `172.168.100.70` 的 `/data/ModelDeploy/build_sophgo/bin` 运行；Sophgo int8 bmodel 多属 batch=1 静态形状，pipeline 内须 `set_cls_batch_size(1)`。
 
-两个 GitHub Actions 工作流：
-- `build_wheel.yml` — 在 ubuntu/windows 上运行 `python -m build`，Python 3.12–3.13，无测试
-- `build_release.yml` — 完整 cmake 构建 + `ctest`（CPU）；GPU 任务仅编译，无测试。标签 `v*` 触发 GitHub Release 上传
+GitHub Actions 工作流（job 名与产物名都带 OS + 工具链标记，便于区分产物最低运行环境）：
+
+- `build_release.yml` — SDK 产物 + GitHub Release（标签 `v*`）。CPU 三档：
+  `ubuntu24.04-gcc13`（glibc 2.39）、`windows2025-vs2026`（MSVC 14.51）、
+  `windows2022-vs2022`（MSVC 14.44）；另有 `cpu_glibc228` 在
+  `manylinux_2_28_x86_64` 容器里出 glibc 2.28 兼容产物（Ubuntu 20.04+/Debian 10+/RHEL 8+），
+  容器内编译测试并校验 `objdump -T` 的 glibc 符号上限。GPU 三档同 CPU 的工具链矩阵，CUDA **12.8**
+  （与本地开发机、`cmake/onnxruntime.cmake` 固定的 ORT 1.29 GPU 包同大版本），仅编译 + 无设备 smoke，
+  并带 `ldd`/`dumpbin` 探针核对 ORT provider 实际依赖的 `cudart` 大版本。
+- `build_aarch64.yml` — **原生 arm64 runner**（`ubuntu-24.04-arm`）构建 + 跑测试，两档：
+  `ubuntu24.04-gcc13`（glibc 2.39）与 `glibc2.28`（`manylinux_2_28_aarch64` 容器，原生执行非 QEMU）。
+  原先的 x86→aarch64 交叉编译作业已移除。
+- `build_wheel.yml` — `python -m build` 快速回归（ubuntu24.04 / windows2025，py3.12-3.13）；
+  另有 `manylinux` 作业经 cibuildwheel 出 `manylinux_2_28_x86_64` 可移植轮子。
+- `build_wheel_aarch64.yml` — 在 `ubuntu-24.04-arm` 上原生经 cibuildwheel 出
+  `manylinux_2_28_aarch64` 轮子（此前跑 QEMU，每次撞 6 小时上限被取消，从未产出）。
+- `rust.yml` — Rust 绑定构建 + 测试。
+
+Linux 兼容性基线：**glibc 2.28**（`manylinux_2_28` 容器，GCC 14）与 **glibc 2.39**
+（Ubuntu 24.04，GCC 13）并存；Windows 基线为 **MSVC 14.44（VS2022 / v143）** 与
+**14.51（VS2026）** 并存。`ilammy/msvc-dev-cmd` 的 `toolset` 是**前缀匹配**：写 `14.40`
+会命中镜像里并存的 `14.44`（日志可验 `VCToolsVersion`），务必写实际存在的精确版本。
+CPU 发布作业 `BUILD_TESTS=OFF`，测试覆盖由 `cpu_glibc228` / GPU / aarch64 作业承担；
+这些测试跑 `~[opencl]~[vulkan]~[gpu]~[regression]`，排除 GCC 上已知失败的 baseline_compare。
 
 ## GitHub 凭据
 

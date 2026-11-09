@@ -14,27 +14,48 @@ permissions:
 
 env:
   PROJECT_NAME: "ModelDeploy"
+  TEST_DATA_URL: "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip"
 
 jobs:
-  # ==================== CPU 构建 + 测试 ====================
+  # ==================== CPU 构建（产物最低运行环境由 job 名标出） ====================
+  #   ubuntu24.04-gcc13.3  → glibc >= 2.39
+  #   windows2025-vs2026   → VC++ 2015-2022 Redist >= 14.51（MSVC 14.51 / v145）
+  #   windows2022-vs2022   → VC++ 2015-2022 Redist >= 14.44（MSVC 14.44 / v143）
+  # glibc 2.28 兼容产物在 cpu_glibc228 作业（manylinux_2_28 容器）中构建。
   cpu:
     name: CPU (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: linux
+          - name: ubuntu24.04-gcc13.3
             runner: ubuntu-latest
+            toolchain: ubuntu24.04-gcc13
+            pkg_os: linux-x64
             c_compiler: gcc
             cpp_compiler: g++
+            toolset: ""
             ext: tar.gz
 
-          - name: windows
+          - name: windows2025-vs2026
             runner: windows-latest
+            toolchain: windows2025-vs2026
+            pkg_os: win-x64
             c_compiler: cl
             cpp_compiler: cl
+            toolset: ""
+            ext: zip
+
+          - name: windows2022-vs2022
+            runner: windows-2022
+            toolchain: windows2022-vs2022
+            pkg_os: win-x64
+            c_compiler: cl
+            cpp_compiler: cl
+            toolset: "14.44"
             ext: zip
 
     steps:
@@ -43,9 +64,31 @@ jobs:
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v6
 
-      - name: Setup MSVC
-        if: runner.os == 'Windows'
+      - name: Setup MSVC (image default toolset)
+        if: runner.os == 'Windows' && matrix.toolset == ''
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup MSVC (toolset ${{ matrix.toolset }})
+        if: runner.os == 'Windows' && matrix.toolset != ''
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          toolset: ${{ matrix.toolset }}
+
+      - name: Toolchain info
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            # cl 无输入时打印版本横幅后返回非 0，故容忍退出码
+            cl 2>&1 | head -2 || true
+          else
+            gcc --version | head -1
+            g++ --version | head -1
+            ldd --version | head -1
+          fi
+          cmake --version | head -1
 
       - name: Install OpenSSL
         if: runner.os == 'Linux'
@@ -56,7 +99,7 @@ jobs:
       - name: Download test data
         shell: bash
         run: |
-          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
+          curl -L -o test_data.zip "$TEST_DATA_URL"
           unzip -q test_data.zip
 
       - name: Configure
@@ -71,18 +114,14 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      - name: Test
-        working-directory: build
-        run: ctest -C Release --output-on-failure -E "opencl|vulkan"
-        env:
-          TEST_DATA_DIR: ${{ github.workspace }}
-
+      # 本组作业只出发布产物（BUILD_TESTS=OFF，ctest 无用例）；实际测试覆盖由
+      # cpu_glibc228 / gpu / aarch64 作业承担，避免"ctest 跑了个寂寞"的假绿。
       - name: Package
         shell: bash
         run: |
           cmake --install build --prefix install
           VERSION="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('dev_{0}', github.run_id) }}"
-          NAME="${PROJECT_NAME}_${VERSION}_${{ matrix.runner == 'ubuntu-latest' && 'linux-x64' || 'win-x64' }}"
+          NAME="${PROJECT_NAME}_${VERSION}_${{ matrix.pkg_os }}_${{ matrix.toolchain }}"
           echo "PKG=${NAME}.${{ matrix.ext }}" >> $GITHUB_ENV
           if [ "${{ matrix.ext }}" = "zip" ]; then 7z a "${NAME}.zip" ./install/*; else tar -czf "${NAME}.tar.gz" -C install .; fi
 
@@ -100,25 +139,147 @@ jobs:
           files: ${{ env.PKG }}
           generate_release_notes: true
 
-  # ==================== GPU 构建（仅编译，无测试） ====================
+  # ==================== CPU 构建：glibc 2.28 兼容产物 ====================
+  # 在 manylinux_2_28 容器里构建（AlmaLinux 8 用户空间，glibc 2.28、GCC 14），
+  # 产物可运行于 Ubuntu 20.04+ / Debian 10+ / RHEL 8+ / 麒麟 / 统信 等。
+  # 容器构建与 runner 本机 glibc 无关，故 ubuntu-22.04 runner 下架也不受影响。
+  cpu_glibc228:
+    name: CPU (manylinux2.28-gcc14 / glibc 2.28)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64:2026.09.05-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        shell: bash
+        run: |
+          set -euxo pipefail
+          dnf install -y openssl-devel unzip tar gzip which || yum install -y openssl-devel unzip tar gzip which
+          # 仓库要求 CMake >= 3.27；AlmaLinux 8 自带 3.26 太旧，用 pip 装 3.31（与 ubuntu24.04 一致）
+          /opt/python/cp312-cp312/bin/python -m pip install --no-cache-dir "cmake==3.31.6" ninja
+          echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
+          # manylinux_2_28 的 GCC 14 通过 gcc-toolset 提供（不同镜像版本号可能变化，取最高者）
+          TOOLSET=$(ls -d /opt/rh/gcc-toolset-*/root/usr/bin 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "${TOOLSET:-}" ]; then
+            echo "$TOOLSET" >> "$GITHUB_PATH"
+          fi
+
+      - name: Toolchain info
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ldd --version | head -1
+          gcc --version | head -1
+          g++ --version | head -1
+          cmake --version | head -1
+
+      - name: Download test data
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L -o test_data.zip "$TEST_DATA_URL"
+          unzip -q test_data.zip
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_CXX_COMPILER=g++
+          -DBUILD_AUDIO=ON -DBUILD_VISION=ON -DBUILD_CAPI=ON
+          -DBUILD_TESTS=ON
+          -DWITH_GPU=OFF
+
+      - name: Build
+        run: cmake --build build
+
+      # 说明：完整 ctest 在本平台会撞上已知的 baseline_compare（MSVC 基线 vs GCC FMA 收缩，
+      # 见 AGENTS.md「baseline_compare 已知平台差异」），故排除 [regression] 与设备相关标签。
+      - name: Test (glibc 2.28 兼容性回归)
+        shell: bash
+        working-directory: build
+        env:
+          TEST_DATA_DIR: ${{ github.workspace }}
+        run: |
+          set -euxo pipefail
+          BIN=./bin/test_modeldeploy
+          "$BIN" "~[opencl]~[vulkan]~[gpu]~[regression]"
+
+      - name: Install + verify glibc floor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --install build --prefix install
+          MAX=$(objdump -T install/lib/*.so* | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sed 's/^GLIBC_//' | sort -uV | tail -1)
+          echo "最高 glibc 符号需求: ${MAX:-unknown}"
+          if [ -n "$MAX" ] && [ "$(printf '%s\n2.28\n' "$MAX" | sort -V | tail -1)" != "2.28" ]; then
+            echo "::error::产物要求 glibc $MAX，高于目标 2.28（依赖包可能由更新的 glibc 构建）"
+            exit 1
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          VERSION="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('dev_{0}', github.run_id) }}"
+          NAME="${PROJECT_NAME}_${VERSION}_linux-x64_glibc2.28-gcc14"
+          echo "PKG=${NAME}.tar.gz" >> $GITHUB_ENV
+          tar -czf "${NAME}.tar.gz" -C install .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PKG }}
+          path: ${{ env.PKG }}
+          retention-days: 7
+
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.PKG }}
+          generate_release_notes: true
+
+  # ==================== GPU 构建（仅编译 + 无设备 smoke） ====================
+  # CUDA 12.8：与本地开发机（RTX 4060 Ti / CUDA 12.8）及预编译 onnxruntime GPU 包
+  # （cmake/onnxruntime.cmake 固定 1.29）保持同一大版本，避免 CI 与产物的 CUDA 大版本错配。
   gpu:
     name: GPU (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: linux
+          - name: ubuntu24.04-gcc13.3-cuda12.8
             runner: ubuntu-latest
+            toolchain: ubuntu24.04-gcc13-cuda12.8
+            pkg_os: linux-x64-gpu
             c_compiler: gcc
             cpp_compiler: g++
+            toolset: ""
             ext: tar.gz
 
-          - name: windows
+          - name: windows2025-vs2026-cuda12.8
             runner: windows-latest
+            toolchain: windows2025-vs2026-cuda12.8
+            pkg_os: win-x64-gpu
             c_compiler: cl
             cpp_compiler: cl
+            toolset: ""
+            ext: zip
+
+          - name: windows2022-vs2022-cuda12.8
+            runner: windows-2022
+            toolchain: windows2022-vs2022-cuda12.8
+            pkg_os: win-x64-gpu
+            c_compiler: cl
+            cpp_compiler: cl
+            toolset: "14.44"
             ext: zip
 
     steps:
@@ -127,12 +288,30 @@ jobs:
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v6
 
-      - name: Setup MSVC
-        if: runner.os == 'Windows'
+      - name: Setup MSVC (image default toolset)
+        if: runner.os == 'Windows' && matrix.toolset == ''
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          toolset: 14.40
           arch: x64
+
+      - name: Setup MSVC (toolset ${{ matrix.toolset }})
+        if: runner.os == 'Windows' && matrix.toolset != ''
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          toolset: ${{ matrix.toolset }}
+
+      - name: Toolchain info
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cl 2>&1 | head -2 || true
+          else
+            gcc --version | head -1
+            g++ --version | head -1
+            ldd --version | head -1
+          fi
+          cmake --version | head -1
 
       - name: Install OpenSSL
         if: runner.os == 'Linux'
@@ -140,15 +319,15 @@ jobs:
       - if: runner.os == 'Windows'
         run: choco install openssl -y
 
-      - name: Setup CUDA
+      - name: Setup CUDA 12.8
         uses: Jimver/cuda-toolkit@master
         with:
-          cuda: "13.2.0"
+          cuda: "12.8.1"
 
       - name: Download test data
         shell: bash
         run: |
-          curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip
+          curl -L -o test_data.zip "$TEST_DATA_URL"
           unzip -q test_data.zip
 
       - name: Configure
@@ -163,6 +342,41 @@ jobs:
 
       - name: Build
         run: cmake --build build
+
+      # 探针：确认预编译 onnxruntime GPU 包实际依赖的 CUDA 大版本与作业安装的 12.8 一致。
+      # 不一致时给出 ::warning（不 fail），便于定位「CI 无 GPU、provider 延迟加载导致从未暴露」的错配。
+      - name: Probe ORT CUDA runtime dependency (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set +e
+          for f in build/_deps/onnxruntime-src/lib/*.so*; do
+            DEPS=$(ldd "$f" 2>/dev/null | grep -Ei 'cudart|cudnn|cublas')
+            if [ -n "$DEPS" ]; then
+              echo "== $f"
+              echo "$DEPS"
+            fi
+          done
+          echo "--- installed CUDA runtime ---"
+          ls -1 /usr/local/cuda*/lib64/libcudart.so* 2>/dev/null | head -5
+          if ! ldd build/_deps/onnxruntime-src/lib/*.so* 2>/dev/null | grep -q 'libcudart.so.12'; then
+            echo "::warning::未在 onnxruntime 动态库里发现 libcudart.so.12 依赖，预编译包可能按其它 CUDA 大版本构建"
+          fi
+
+      - name: Probe ORT CUDA runtime dependency (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set +e
+          DLL=$(find build/_deps/onnxruntime-src/lib -iname '*providers_cuda*.dll' | head -1)
+          echo "provider: ${DLL:-<not found>}"
+          if [ -n "$DLL" ]; then
+            dumpbin -dependents "$DLL" | grep -Ei 'cudart|cudnn|cublas'
+          fi
+          ls -1 "$CUDA_PATH"/bin/cudart64_*.dll 2>/dev/null || true
+          if ! dumpbin -dependents "$DLL" 2>/dev/null | grep -qi 'cudart64_12'; then
+            echo "::warning::未在 onnxruntime_providers_cuda 依赖中发现 cudart64_12，预编译包可能按其它 CUDA 大版本构建"
+          fi
 
       - name: GPU smoke (0 failures, graceful skip on device-less runner)
         shell: bash
@@ -187,7 +401,7 @@ jobs:
         run: |
           cmake --install build --prefix install
           VERSION="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('dev_{0}', github.run_id) }}"
-          NAME="${PROJECT_NAME}_${VERSION}_${{ matrix.runner == 'ubuntu-latest' && 'linux-x64-gpu' || 'win-x64-gpu' }}"
+          NAME="${PROJECT_NAME}_${VERSION}_${{ matrix.pkg_os }}_${{ matrix.toolchain }}"
           echo "PKG=${NAME}.${{ matrix.ext }}" >> $GITHUB_ENV
           if [ "${{ matrix.ext }}" = "zip" ]; then 7z a "${NAME}.zip" ./install/*; else tar -czf "${NAME}.tar.gz" -C install .; fi
 

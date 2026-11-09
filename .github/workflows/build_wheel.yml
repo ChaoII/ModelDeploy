@@ -5,29 +5,31 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
 env:
   PROJECT_NAME: "ModelDeploy"
+
 jobs:
+  # ==================== 本机 runner 直编（快速回归） ====================
+  # 注意：ubuntu-24.04 上 `python -m build` 出来的 wheel 平台标签是 linux_x86_64、
+  # 依赖 glibc 2.39，不能当通用 Linux 轮子分发。可移植轮子见下面的 manylinux 作业。
   build:
-    runs-on: ${{ matrix.os }}
+    name: wheel (${{ matrix.name }} / py${{ matrix.python-version }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         python-version: [ "3.12", "3.13" ]
-        os: [ ubuntu-latest, windows-latest ]
-        c_compiler: [ gcc, cl ]
         include:
-          - os: windows-latest
-            c_compiler: cl
-            cpp_compiler: cl
-          - os: ubuntu-latest
+          - name: ubuntu24.04-gcc13
+            runner: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
-        exclude:
-          - os: windows-latest
-            c_compiler: gcc
-          - os: ubuntu-latest
+          - name: windows2025-vs2026
+            runner: windows-latest
             c_compiler: cl
+            cpp_compiler: cl
 
     steps:
       - uses: actions/checkout@v4
@@ -42,8 +44,20 @@ jobs:
           python -m pip install build
 
       - name: Set up MSVC Developer Command Prompt
-        if: matrix.os == 'windows-latest'
+        if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Toolchain info
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cl 2>&1 | head -2 || true
+          else
+            gcc --version | head -1
+            g++ --version | head -1
+            ldd --version | head -1
+          fi
+          python --version
 
       - name: Build wheels
         run: python -m build
@@ -51,6 +65,39 @@ jobs:
       - name: Upload CI Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-py${{ matrix.python-version }}
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.name }}-py${{ matrix.python-version }}
           path: dist/*
+          retention-days: 7
+
+  # ==================== Linux x86_64 可移植轮子（manylinux_2_28 / glibc 2.28） ====================
+  # 与 SDK 的 glibc 2.28 基线一致：在 manylinux_2_28 容器内构建并自动 auditwheel 修复，
+  # 平台标签为 manylinux_2_28_x86_64，可装到 Ubuntu 20.04+/Debian 10+/RHEL 8+ 等。
+  manylinux:
+    name: wheel (manylinux2.28-gcc14 / cp312-cp313)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build manylinux x86_64 wheels
+        uses: pypa/cibuildwheel@v2.23.4
+        with:
+          output-dir: dist
+        env:
+          CIBW_ARCHS: x86_64
+          CIBW_BUILD: "cp312-* cp313-*"
+          CIBW_PROJECT_REQUIRES_PYTHON: ">=3.12"
+          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64:2026.09.05-1
+          # 仓库要求 CMake >= 3.27；为每个 cp3xx 构建环境装一份 pip cmake，避免镜像自带版本过旧
+          CIBW_BEFORE_BUILD_LINUX: >-
+            python -m pip install --no-cache-dir "cmake==3.31.6"
+          CIBW_BEFORE_ALL_LINUX: >-
+            (yum install -y openssl-devel || dnf install -y openssl-devel) || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-x86_64-manylinux2.28
+          path: dist/*.whl
           retention-days: 7
