@@ -1,0 +1,45 @@
+name: Build deps
+
+# 手工触发：在 manylinux_2_28（glibc 2.28）容器里编 Linux 静态依赖，产物作为 artifact 下载，
+# 上传到 modelscope 依赖仓（ChaoII0987/ModelDeploy_cmake_deps）后，再更新 cmake/*.cmake 的文件名与 SHA256。
+on:
+  workflow_dispatch:
+    inputs:
+      opencv_version:
+        description: "OpenCV tag（例如 5.1.0；源码取自 github.com/opencv/opencv）"
+        required: true
+        default: "5.1.0"
+
+permissions:
+  contents: read
+
+jobs:
+  opencv:
+    name: opencv ${{ matrix.pkg }} (${{ inputs.opencv_version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pkg: opencv_5_x_linux_x64_static
+            runner: ubuntu-24.04
+            image: quay.io/pypa/manylinux_2_28_x86_64:2026.09.05-1
+          - pkg: opencv_5_x_linux_aarch64_static
+            runner: ubuntu-24.04-arm
+            image: quay.io/pypa/manylinux_2_28_aarch64:2026.09.05-1
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    container:
+      image: ${{ matrix.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build static OpenCV
+        run: bash tools/deps/build_opencv_static.sh "${{ inputs.opencv_version }}" "${{ matrix.pkg }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.pkg }}-${{ inputs.opencv_version }}-glibc2.28
+          path: dist/*.zip
+          retention-days: 14

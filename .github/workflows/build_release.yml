@@ -104,7 +104,13 @@ jobs:
         run: |
           # modelscope 在大文件下载时偶发 HTTP/2 stream INTERNAL_ERROR（curl 92），
           # 用 HTTP/1.1 + 断点续传 + 重试，避免整包 1.8GB 重下
-          curl -fL --http1.1 --retry 5 --retry-delay 5 --retry-all-errors -C - -o test_data.zip "$TEST_DATA_URL"
+          ok=0
+          for i in 1 2 3 4 5; do
+            if curl -fL --http1.1 -C - -o test_data.zip "$TEST_DATA_URL"; then ok=1; break; fi
+            echo "::warning::test_data 下载失败（第 $i 次），5s 后断点续传重试"
+            sleep 5
+          done
+          [ "$ok" = "1" ] || { echo "::error::test_data.zip 下载失败"; exit 1; }
           unzip -q -o test_data.zip
 
       - name: Configure
@@ -186,7 +192,13 @@ jobs:
         run: |
           set -euxo pipefail
           # modelscope 偶发 HTTP/2 stream INTERNAL_ERROR（curl 92）：HTTP/1.1 + 续传 + 重试
-          curl -fL --http1.1 --retry 5 --retry-delay 5 --retry-all-errors -C - -o test_data.zip "$TEST_DATA_URL"
+          ok=0
+          for i in 1 2 3 4 5; do
+            if curl -fL --http1.1 -C - -o test_data.zip "$TEST_DATA_URL"; then ok=1; break; fi
+            echo "::warning::test_data 下载失败（第 $i 次），5s 后断点续传重试"
+            sleep 5
+          done
+          [ "$ok" = "1" ] || { echo "::error::test_data.zip 下载失败"; exit 1; }
           unzip -q -o test_data.zip
 
       - name: Configure
@@ -224,6 +236,7 @@ jobs:
           echo "installed shared libs:"; echo "$SO_FILES"
           MAX=$(objdump -T $SO_FILES | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sed 's/^GLIBC_//' | sort -uV | tail -1)
           echo "最高 glibc 符号需求: ${MAX:-unknown}"
+          echo "最高 libstdc++ 符号需求: $(objdump -T $SO_FILES | grep -oE 'GLIBCXX_[0-9.]+|CXXABI_[0-9.]+' | sort -uV | tail -1)"
           if [ -n "$MAX" ] && [ "$(printf '%s\n2.28\n' "$MAX" | sort -V | tail -1)" != "2.28" ]; then
             echo "::error::产物要求 glibc $MAX，高于目标 2.28（依赖包可能由更新的 glibc 构建）"
             exit 1
@@ -337,7 +350,13 @@ jobs:
         shell: bash
         run: |
           # modelscope 偶发 HTTP/2 stream INTERNAL_ERROR（curl 92）：HTTP/1.1 + 续传 + 重试
-          curl -fL --http1.1 --retry 5 --retry-delay 5 --retry-all-errors -C - -o test_data.zip "$TEST_DATA_URL"
+          ok=0
+          for i in 1 2 3 4 5; do
+            if curl -fL --http1.1 -C - -o test_data.zip "$TEST_DATA_URL"; then ok=1; break; fi
+            echo "::warning::test_data 下载失败（第 $i 次），5s 后断点续传重试"
+            sleep 5
+          done
+          [ "$ok" = "1" ] || { echo "::error::test_data.zip 下载失败"; exit 1; }
           unzip -q -o test_data.zip
 
       - name: Configure
