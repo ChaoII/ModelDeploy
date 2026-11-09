@@ -47,8 +47,9 @@ jobs:
       - name: Download test data
         shell: bash
         run: |
-          curl -L -o test_data.zip "$TEST_DATA_URL"
-          unzip -q test_data.zip
+          # modelscope 偶发 HTTP/2 stream INTERNAL_ERROR（curl 92）：HTTP/1.1 + 续传 + 重试
+          curl -fL --http1.1 --retry 5 --retry-delay 5 --retry-all-errors -C - -o test_data.zip "$TEST_DATA_URL"
+          unzip -q -o test_data.zip
 
       - name: Configure
         run: >
@@ -148,8 +149,9 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          curl -L -o test_data.zip "$TEST_DATA_URL"
-          unzip -q test_data.zip
+          # modelscope 偶发 HTTP/2 stream INTERNAL_ERROR（curl 92）：HTTP/1.1 + 续传 + 重试
+          curl -fL --http1.1 --retry 5 --retry-delay 5 --retry-all-errors -C - -o test_data.zip "$TEST_DATA_URL"
+          unzip -q -o test_data.zip
 
       - name: Configure
         run: >

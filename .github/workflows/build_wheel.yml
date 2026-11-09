@@ -20,14 +20,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.12", "3.13" ]
+        # 显式列全：GitHub 的 matrix.include 只会“追加/覆盖”已有组合，像原来那样
+        # 把 platform 放 include 里会让后一条覆盖前一条，导致 linux 作业静默消失。
         include:
           - name: ubuntu24.04-gcc13
             runner: ubuntu-latest
+            python-version: "3.12"
+            c_compiler: gcc
+            cpp_compiler: g++
+          - name: ubuntu24.04-gcc13
+            runner: ubuntu-latest
+            python-version: "3.13"
             c_compiler: gcc
             cpp_compiler: g++
           - name: windows2025-vs2026
             runner: windows-latest
+            python-version: "3.12"
+            c_compiler: cl
+            cpp_compiler: cl
+          - name: windows2025-vs2026
+            runner: windows-latest
+            python-version: "3.13"
             c_compiler: cl
             cpp_compiler: cl
 

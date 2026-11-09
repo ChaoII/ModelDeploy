@@ -99,8 +99,10 @@ jobs:
       - name: Download test data
         shell: bash
         run: |
-          curl -L -o test_data.zip "$TEST_DATA_URL"
-          unzip -q test_data.zip
+          # modelscope 在大文件下载时偶发 HTTP/2 stream INTERNAL_ERROR（curl 92），
+          # 用 HTTP/1.1 + 断点续传 + 重试，避免整包 1.8GB 重下
+          curl -fL --http1.1 --retry 5 --retry-delay 5 --retry-all-errors -C - -o test_data.zip "$TEST_DATA_URL"
+          unzip -q -o test_data.zip
 
       - name: Configure
         run: >
@@ -180,8 +182,9 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          curl -L -o test_data.zip "$TEST_DATA_URL"
-          unzip -q test_data.zip
+          # modelscope 偶发 HTTP/2 stream INTERNAL_ERROR（curl 92）：HTTP/1.1 + 续传 + 重试
+          curl -fL --http1.1 --retry 5 --retry-delay 5 --retry-all-errors -C - -o test_data.zip "$TEST_DATA_URL"
+          unzip -q -o test_data.zip
 
       - name: Configure
         run: >
@@ -249,6 +252,8 @@ jobs:
   # ==================== GPU 构建（仅编译 + 无设备 smoke） ====================
   # CUDA 12.8：与本地开发机（RTX 4060 Ti / CUDA 12.8）及预编译 onnxruntime GPU 包
   # （cmake/onnxruntime.cmake 固定 1.29）保持同一大版本，避免 CI 与产物的 CUDA 大版本错配。
+  # 注意：CUDA 12.8 的 crt/host_config.h 明确拒绝 MSVC 19.5x（VS2026），所以 GPU 侧
+  # 只保留 windows-2022 + v143（14.44）。若以后要出 VS2026/GPU 产物，必须把 CUDA 升到 13.x。
   gpu:
     name: GPU (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
@@ -266,15 +271,6 @@ jobs:
             cpp_compiler: g++
             toolset: ""
             ext: tar.gz
-
-          - name: windows2025-vs2026-cuda12.8
-            runner: windows-latest
-            toolchain: windows2025-vs2026-cuda12.8
-            pkg_os: win-x64-gpu
-            c_compiler: cl
-            cpp_compiler: cl
-            toolset: ""
-            ext: zip
 
           - name: windows2022-vs2022-cuda12.8
             runner: windows-2022
@@ -322,6 +318,13 @@ jobs:
       - if: runner.os == 'Windows'
         run: choco install openssl -y
 
+      # CUDA runfile 的安装器依赖 libxml2.so.2，ubuntu-24.04 runner 镜像未预装
+      - name: Install CUDA prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2t64 || sudo apt-get install -y libxml2
+
       - name: Setup CUDA 12.8
         uses: Jimver/cuda-toolkit@master
         with:
@@ -330,8 +333,9 @@ jobs:
       - name: Download test data
         shell: bash
         run: |
-          curl -L -o test_data.zip "$TEST_DATA_URL"
-          unzip -q test_data.zip
+          # modelscope 偶发 HTTP/2 stream INTERNAL_ERROR（curl 92）：HTTP/1.1 + 续传 + 重试
+          curl -fL --http1.1 --retry 5 --retry-delay 5 --retry-all-errors -C - -o test_data.zip "$TEST_DATA_URL"
+          unzip -q -o test_data.zip
 
       - name: Configure
         run: >

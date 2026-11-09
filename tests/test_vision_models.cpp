@@ -563,6 +563,9 @@ TEST_CASE("OCR Recognizer model", "[vision_models]") {
     if (!fs::exists(modelfile)) {
         modelfile = model_path("onnx/ocr/ppocrv5_mobile/rec_infer.onnx");
     }
+    // 测试数据缺失时跳过：模型文件不存在再构造 Recognizer 会走进 SDK 初始化失败路径
+    // （当前会 SIGSEGV，属 SDK 健壮性问题，另行跟踪），这里先保证 CI 不因缺数据崩溃。
+    if (!fs::exists(modelfile)) return;
 
     auto dict = get_test_data() / "ppocrv6_tiny_dict.txt";
     if (!fs::exists(dict)) return;
