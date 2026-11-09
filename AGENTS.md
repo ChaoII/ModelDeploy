@@ -50,7 +50,7 @@ cd build && ctest -C Release --output-on-failure
 编码输入统一为 `encode(const VideoFrame&)`：按 `ImageData::device()` 路由（CPU 软编 /
 GPU CUDA 直通 / TPU 占位 fail-closed），`pts_ms` 可注入外部时间戳（0=内部按 fps 自增）。
 
-测试数据需单独下载：`curl -L -o test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip`
+测试数据需单独下载：`curl -L -o md_test_data.zip https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/md_test_data.zip`（解压后把 `md_test_data/` 改名为 `test_data/`，测试代码按 `<TEST_DATA_DIR>/test_data` 查找）
 
 **模型/权重（重要）**：`test_data/test_models/` 下已按后端预置大量模型——`onnx/`、`mnn/`、
 `ncnn/`、`trt/`（含现成 `.engine`，如 `trt/yolo11n/yolo11n.engine`、`yolo11n_without_nms.engine`、
@@ -157,10 +157,11 @@ CPU 发布作业 `BUILD_TESTS=OFF`，测试覆盖由 `cpu_glibc228` / GPU / aarc
 `windows-2025-vs2026`。CUDA 12.8 的 `crt/host_config.h` 拒绝 MSVC 19.5x，所以 GPU 侧只有
 v143；要出 VS2026/GPU 产物必须升到 CUDA 13.x。
 
-**已知：modelscope 上的 `test_data.zip` 目录结构落后于代码**——包内是 `test_data/test_models/<模型>`
-扁平结构且缺 `qr_sample.png`，而代码期望 `test_data/test_models/{onnx,mnn,ncnn,trt,sophgo}/...`。
-结果是大量模型用例在 `if (!fs::exists(...)) return;` 处静默跳过（CI 绿但覆盖很浅）。
-测试数据补齐前，模型类用例失败优先怀疑此结构不匹配，而不是代码回归。
+**测试数据包（modelscope `md_test_data.zip`）**：为新布局 `md_test_data/{test_images,test_models/onnx/...}`
+的**最小 CI 集**（约 1.6 GB，仅保留 CI 会加载的 ORT 模型 + 图片 + 字典/音频，MNN/ncnn/TRT/Sophgo
+的模型都不再打包，对应后端的用例会自动跳过）。下载后需把 `md_test_data/` 改名为 `test_data/`
+（`tools/fetch_test_data.{sh,ps1}` 已自动改名），测试代码按 `<TEST_DATA_DIR>/test_data` 查找。
+旧的 1.8 GB `test_data.zip`（扁平结构、缺 `qr_sample.png`）已从依赖仓移除。
 
 ## GitHub 凭据
 

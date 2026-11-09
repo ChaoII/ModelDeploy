@@ -2,7 +2,7 @@
 # 一键下载 ModelDeploy 测试数据(test_data.zip)并解压到仓库根 test_data/
 set -euo pipefail
 
-URL="${URL:-https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip}"
+URL="${URL:-https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/md_test_data.zip}"
 FORCE=0
 OUTDIR=""
 
@@ -19,7 +19,7 @@ if [[ -z "$OUTDIR" ]]; then
   OUTDIR="$(cd "$(dirname "$0")/.." && pwd)"
 fi
 TEST_DATA_DIR="$OUTDIR/test_data"
-ZIP="$OUTDIR/test_data.zip"
+ZIP="$OUTDIR/md_test_data.zip"
 
 if [[ -d "$TEST_DATA_DIR" && "$FORCE" -eq 0 ]]; then
   echo "test_data/ 已存在(用 --force 重新下载)。"
@@ -40,4 +40,11 @@ if ! unzip -o -q "$ZIP" -d "$OUTDIR"; then
   exit 1
 fi
 rm -f "$ZIP"
+
+# 新包根目录名是 md_test_data/，测试代码按 <TEST_DATA_DIR>/test_data 查找，这里落成 test_data/
+if [[ -d "$OUTDIR/md_test_data" ]]; then
+  rm -rf "$TEST_DATA_DIR"
+  mv "$OUTDIR/md_test_data" "$TEST_DATA_DIR"
+fi
+
 echo "完成: $TEST_DATA_DIR"

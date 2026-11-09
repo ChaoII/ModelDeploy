@@ -67,7 +67,7 @@ powershell -ExecutionPolicy Bypass -File tools/fetch_test_data.ps1
 bash tools/fetch_test_data.sh
 ```
 
-脚本从 modelscope 拉取 `test_data.zip` 并解压到仓库根 `test_data/`（含测试图片 `test_images/` 与测试模型 `test_models/`）。重新下载加 `-Force` / `--force`。
+脚本从 modelscope 拉取 `md_test_data.zip`（解压后自动改名为 `test_data/`） 并解压到仓库根 `test_data/`（含测试图片 `test_images/` 与测试模型 `test_models/`）。重新下载加 `-Force` / `--force`。
 
 ## 3. 编写第一个检测程序
 

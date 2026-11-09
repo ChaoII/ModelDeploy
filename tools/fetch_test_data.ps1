@@ -2,7 +2,7 @@
 # 一键下载 ModelDeploy 测试数据(test_data.zip)并解压到仓库根 test_data/
 [CmdletBinding()]
 param(
-    [string]$Url = "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/test_data.zip",
+    [string]$Url = "https://www.modelscope.cn/models/ChaoII0987/ModelDeploy_cmake_deps/resolve/master/md_test_data.zip",
     [switch]$Force,
     [string]$OutDir = ""
 )
@@ -13,7 +13,7 @@ if ([string]::IsNullOrEmpty($OutDir)) {
     $OutDir = Split-Path -Parent $PSScriptRoot
 }
 $testDataDir = Join-Path $OutDir "test_data"
-$zipPath = Join-Path $OutDir "test_data.zip"
+$zipPath = Join-Path $OutDir "md_test_data.zip"
 
 if ((Test-Path -LiteralPath $testDataDir) -and -not $Force) {
     Write-Host "test_data/ 已存在(用 -Force 重新下载)。"
@@ -38,4 +38,11 @@ try {
     exit 1
 }
 Remove-Item -LiteralPath $zipPath -Force
+
+# 新包根目录名是 md_test_data/，测试代码按 <TEST_DATA_DIR>/test_data 查找，这里落成 test_data/
+$newDir = Join-Path $OutDir "md_test_data"
+if (Test-Path -LiteralPath $newDir) {
+    if (Test-Path -LiteralPath $testDataDir) { Remove-Item -LiteralPath $testDataDir -Recurse -Force }
+    Rename-Item -LiteralPath $newDir -NewName "test_data"
+}
 Write-Host "完成: $testDataDir"
