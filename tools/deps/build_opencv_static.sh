@@ -30,9 +30,12 @@ TOOLSET=$(ls -d /opt/rh/gcc-toolset-*/root/usr/bin 2>/dev/null | sort -V | tail 
 if [ -n "${TOOLSET:-}" ]; then
   export PATH="${TOOLSET}:${PATH}"
 fi
-if ! command -v cmake >/dev/null 2>&1; then
+if ! command -v cmake >/dev/null 2>&1 || ! command -v ninja >/dev/null 2>&1; then
   python -m pip install --no-cache-dir "cmake==3.31.6" ninja
 fi
+# 容器里可能自带旧版 cmake 但没有 ninja：统一用 pip 版覆盖，避免版本/生成器不一致
+python -m pip install --no-cache-dir "cmake==3.31.6" ninja >/dev/null 2>&1 || true
+hash -r
 if ! command -v unzip >/dev/null 2>&1 || ! command -v zip >/dev/null 2>&1; then
   (dnf install -y unzip zip || yum install -y unzip zip)
 fi
@@ -158,6 +161,8 @@ OPTS=(
 rm -rf "$BUILD_DIR" "$INSTALL_DIR"
 cmake -S "$SRC_DIR" -B "$BUILD_DIR" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=gcc \
+  -DCMAKE_CXX_COMPILER=g++ \
   -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
   -DCMAKE_INSTALL_LIBDIR="$LIBDIR" \
   -DOPENCV_GENERATE_PKGCONFIG=OFF \
