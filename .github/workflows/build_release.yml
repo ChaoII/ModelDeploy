@@ -64,8 +64,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v6
+      - name: Ensure Ninja
+        shell: bash
+        run: |
+          # GitHub 镜像已内置 ninja；不再依赖第三方 action（其下载偶发失败会让 job 在 0.3 分钟内直接挂掉）
+          if ! command -v ninja >/dev/null 2>&1; then
+            if [ "${{ runner.os }}" = "Windows" ]; then
+              choco install ninja -y
+            else
+              sudo apt-get update && sudo apt-get install -y ninja-build
+            fi
+          fi
+          ninja --version
 
       - name: Setup MSVC (image default toolset)
         if: runner.os == 'Windows' && matrix.toolset == ''
@@ -326,8 +336,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v6
+      - name: Ensure Ninja
+        shell: bash
+        run: |
+          # GitHub 镜像已内置 ninja；不再依赖第三方 action（其下载偶发失败会让 job 在 0.3 分钟内直接挂掉）
+          if ! command -v ninja >/dev/null 2>&1; then
+            if [ "${{ runner.os }}" = "Windows" ]; then
+              choco install ninja -y
+            else
+              sudo apt-get update && sudo apt-get install -y ninja-build
+            fi
+          fi
+          ninja --version
 
       - name: Setup MSVC (image default toolset)
         if: runner.os == 'Windows' && matrix.toolset == ''
