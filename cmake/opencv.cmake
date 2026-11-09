@@ -4,6 +4,8 @@ message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "CMAKE_VS_PLATFORM_NAME: ${CMAKE_VS_PLATFORM_NAME}")
 
 # --- 联网下载预编译 OpenCV5 ---
+# Linux 包为 OpenCV 5.1.0，在 manylinux_2_28（AlmaLinux 8 / glibc 2.28）内静态构建，
+# 用 tools/deps/build_opencv_static.sh + .github/workflows/build_deps.yml 产出。
 set(opencv_5_x_win_x64_static_md_FILE_NAME "opencv_5_x_win_x64_static.zip")
 set(opencv_5_x_linux_x64_static_FILE_NAME "opencv_5_x_linux_x64_static.zip")
 set(opencv_5_x_linux_aarch64_static_FILE_NAME "opencv_5_x_linux_aarch64_static.zip")
@@ -18,11 +20,11 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
         set(OPENCV_FILE_NAME ${opencv_5_x_linux_x64_static_FILE_NAME})
         set(OPENCV_URL ${OPENCV_BASE_URL}/${OPENCV_FILE_NAME})
-        set(OPENCV_HASH "SHA256=e912077b5f64829ca3cb8a1b6edaa557878e823efb6def58eeaaebd0f2fc2a37")
+        set(OPENCV_HASH "SHA256=277d79541c60808a6e6fa1791a64c937220676a66592f92313495be6244d450f")
     elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
         set(OPENCV_FILE_NAME ${opencv_5_x_linux_aarch64_static_FILE_NAME})
         set(OPENCV_URL ${OPENCV_BASE_URL}/${OPENCV_FILE_NAME})
-        set(OPENCV_HASH "SHA256=c46f4a97ddb0ccc6abfa9d54aec633bdb7f970ee38588ac1081c495d83f785a9")
+        set(OPENCV_HASH "SHA256=a76e5df5ca210d6bc0ac236668bfe8a56e8af51896611e091a50dc21d634553e")
     endif ()
 else ()
     message(FATAL_ERROR "OpenCV: unsupported system ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
