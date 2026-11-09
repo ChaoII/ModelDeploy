@@ -4,6 +4,7 @@ message(STATUS "CMAKE_VS_PLATFORM_NAME: ${CMAKE_VS_PLATFORM_NAME}")
 
 set(onnxruntime_win_x64_static_1_29_0_FILE_NAME "onnxruntime_win_x64_static_1_29_0.zip")
 set(onnxruntime_win_x64_gpu_1_29_0_FILE_NAME "onnxruntime_win_x64_gpu_1_29_0.zip")
+set(onnxruntime_win_x64_gpu_1_29_0_cuda13_FILE_NAME "onnxruntime_win_x64_gpu_1_29_0_cuda13.zip")
 # Linux 侧改用 csukuangfj/onnxruntime-libs 的 glibc2.28 静态包（AlmaLinux 8 用户空间构建）：
 # 自建包是在 Ubuntu 22.04/24.04 上编的，会引入 GLIBC_2.35+ 符号，glibc 2.28 目标机无法加载。
 set(onnxruntime_linux_x64_static_1_29_1_glibc2_28_FILE_NAME "onnxruntime_linux_x64_static_1_29_1_glibc2_28.zip")
@@ -19,9 +20,18 @@ include(FetchContent)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     if (WITH_GPU)
-        set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_gpu_1_29_0_FILE_NAME})
-        set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
-        set(ONNXRUNTIME_HASH "SHA256=06c260526302a5c896a9438b862c2374d8af8fe25e3be9d6205ea1234f145a48")
+        # 按 CUDAToolkit 大版本选 GPU 包：
+        #   cu12 包 = 自建（cublas64_12），cu13 包 = Microsoft.ML.OnnxRuntime.Gpu.Windows 1.29.0
+        #   （官方 1.27+ GPU 包默认 CUDA 13.0 构建，cublas64_13）
+        if (CUDA_MAJOR_VERSION GREATER_EQUAL 13)
+            set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_gpu_1_29_0_cuda13_FILE_NAME})
+            set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+            set(ONNXRUNTIME_HASH "SHA256=06ec04215bfa314fafd4694a4fb4948207657ca24baaaaec05ddd38578306949")
+        else ()
+            set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_gpu_1_29_0_FILE_NAME})
+            set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})
+            set(ONNXRUNTIME_HASH "SHA256=06c260526302a5c896a9438b862c2374d8af8fe25e3be9d6205ea1234f145a48")
+        endif ()
     else ()
         set(ONNXRUNTIME_FILE_NAME ${onnxruntime_win_x64_static_1_29_0_FILE_NAME})
         set(ONNXRUNTIME_URL ${ONNXRUNTIME_BASE_URL}/${ONNXRUNTIME_FILE_NAME})

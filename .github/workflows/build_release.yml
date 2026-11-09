@@ -268,8 +268,8 @@ jobs:
   # ==================== GPU 构建（仅编译 + 无设备 smoke） ====================
   # CUDA 12/13 双版本：onnxruntime GPU 包按 CUDA 大版本区分
   # （cu12 包依赖 libcublas.so.12，cu13 包依赖 libcublas.so.13，见 cmake/onnxruntime.cmake）。
-  # CUDA 12.8 的 crt/host_config.h 拒绝 MSVC 19.5x（VS2026），所以 Windows 侧只保留
-  # windows-2022 + v143（14.44）；Linux 无此限制，12.8 与 13.2 都出。
+  # CUDA 12.8 与 13.2 都出；CUDA 12.8 的 crt/host_config.h 拒绝 MSVC 19.5x（VS2026），
+  # 所以 Windows 侧统一用 windows-2022 + v143（14.44）。
   gpu:
     name: GPU (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
@@ -306,6 +306,17 @@ jobs:
             cuda: "12.8.1"
             cuda_major: "12"
             toolchain: windows2022-vs2022-cuda12.8
+            pkg_os: win-x64-gpu
+            c_compiler: cl
+            cpp_compiler: cl
+            toolset: "14.44"
+            ext: zip
+
+          - name: windows2022-vs2022-cuda13.2
+            runner: windows-2022
+            cuda: "13.2.0"
+            cuda_major: "13"
+            toolchain: windows2022-vs2022-cuda13.2
             pkg_os: win-x64-gpu
             c_compiler: cl
             cpp_compiler: cl
