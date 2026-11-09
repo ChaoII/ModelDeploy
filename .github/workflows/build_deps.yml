@@ -3,6 +3,11 @@ name: Build deps
 # 手工触发：在 manylinux_2_28（glibc 2.28）容器里编 Linux 静态依赖，产物作为 artifact 下载，
 # 上传到 modelscope 依赖仓（ChaoII0987/ModelDeploy_cmake_deps）后，再更新 cmake/*.cmake 的文件名与 SHA256。
 on:
+  # 手动触发用 workflow_dispatch；但 workflow_dispatch 只能触发默认分支上已存在的工作流文件，
+  # 所以另加一个专用分支前缀触发（ci/deps-*），方便在合并到 main 之前先产出依赖包。
+  push:
+    branches:
+      - "ci/deps-*"
   workflow_dispatch:
     inputs:
       opencv_version:
@@ -15,7 +20,7 @@ permissions:
 
 jobs:
   opencv:
-    name: opencv ${{ matrix.pkg }} (${{ inputs.opencv_version }})
+    name: opencv ${{ matrix.pkg }} (${{ inputs.opencv_version || '5.1.0' }})
     strategy:
       fail-fast: false
       matrix:
@@ -35,11 +40,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build static OpenCV
-        run: bash tools/deps/build_opencv_static.sh "${{ inputs.opencv_version }}" "${{ matrix.pkg }}"
+        run: bash tools/deps/build_opencv_static.sh "${{ inputs.opencv_version || '5.1.0' }}" "${{ matrix.pkg }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.pkg }}-${{ inputs.opencv_version }}-glibc2.28
+          name: ${{ matrix.pkg }}-${{ inputs.opencv_version || '5.1.0' }}-glibc2.28
           path: dist/*.zip
           retention-days: 14
