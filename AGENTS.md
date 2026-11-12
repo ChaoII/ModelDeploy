@@ -96,7 +96,7 @@ cmake/          — 查找 onnxruntime、mnn、opencv、trt 的模块
 - **MSVC**：必须添加 `/utf-8` 编译选项（根 CMakeLists.txt 已为 SDK 自动设置）。设置 `CMAKE_CXX_STANDARD=17`。
 - **scikit-build-core**：使用多配置生成器，必须在 `pyproject.toml` 中显式设置 `CMAKE_BUILD_TYPE="Release"`，环境变量不会被转发。
 - **Python `__init__.py`**：由 `python/__init__.py.in` 生成 —— CMake 在配置时替换 `@WITH_GPU@`、`@ENABLE_ORT@` 等变量。生成文件位于 `python/modeldeploy/__init__.py`。
-- **BUILD_ENCRYPTION**：基于 mbedTLS（git submodule，`third_party/mbedtls`，构建前 `git submodule update --init --recursive`）。无系统 OpenSSL 依赖。
+- **BUILD_ENCRYPTION**：基于 mbedTLS（git submodule，`third_party/mbedtls`，构建前 `git submodule update --init --recursive`）。无系统 OpenSSL 依赖。**安装包裁剪**：mbedTLS 作为子模块会无条件把 `include/mbedtls|psa|everest` 头文件与 `libmbed*/libeverest*/libp256m*.a` 静态库装进 SDK 安装前缀（它的 `DISABLE_PACKAGE_CONFIG_AND_INSTALL` 只挡住 cmake 配置导出，挡不住 library/ 与 `3rdparty/everest` 的 install）。但 SDK 公共头不引用 mbedTLS、且 mbedTLS 已静态链入 `libModelDeploySDK.so`（运行时不依赖外置 `.a`），故根 CMake 在 `BUILD_ENCRYPTION` 下拉 `INSTALL_MBEDTLS_HEADERS=OFF` 并在安装末尾用 `install(CODE)` 清除这些第三方产物，使发布包只含 `include/modeldeploy` + 库。用 `install(CODE)` 裁剪而非改 mbedtls 子模块源码，是为了让改动在 CI 拉取时可复现。
 - **GPU 构建**：默认 CUDA 架构为 86（RTX 40 系列）。测试数据来自 modelscope，不在仓库内。
 - **TRT 后端**：需要预先通过 `trtexec` 生成 `.engine` 文件。从 ONNX 在线构建 engine 速度较慢。
 - **ncnn 后端**：`cmake/ncnn.cmake` 按平台（Win-x64 / Linux-x64 / Linux-aarch64）从 modelscope 自动下载预编译静态包（含 ncnn + glslang 与各自 CMake config，`find_package(ncnn)`/`find_package(glslang)` 直接可用）；不支持平台配置时 fail-fast。MNN 同理（`cmake/mnn.cmake`，单库静态包，无独立 CUDA 库）。
