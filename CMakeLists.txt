@@ -490,6 +490,10 @@ endif ()
 if (BUILD_ENCRYPTION)
     set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
     set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    # mbedTLS 作为子模块接入时，其 include/CMakeLists 默认会把 mbedtls|psa 头文件
+    # install 进 SDK 安装前缀；SDK 公共头并不引用它们（mbedTLS 仅加密模块私有实现），
+    # 且 mbedTLS 已静态链入 libModelDeploySDK.so，故关掉头文件安装，仅保留静态库链接。
+    set(INSTALL_MBEDTLS_HEADERS OFF CACHE BOOL "" FORCE)
     add_subdirectory(third_party/mbedtls)
     # mbedtls 自带 /W3 /WX，目标名随构建模式有 static/非 static 两种，统一静默（避免平台差异触发 /WX）
     md_silence_external(mbedcrypto)
@@ -677,5 +681,32 @@ if (NOT BUILD_PYTHON)
             "${CMAKE_BINARY_DIR}/ModelDeploySDKConfig.cmake"
             "${CMAKE_BINARY_DIR}/ModelDeploySDKConfigVersion.cmake"
             DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ModelDeploySDK)
+
+    # ==================== 裁剪 mbedTLS 第三方产物 ====================
+    # mbedTLS 经 add_subdirectory 接入，其 library/ 与 3rdparty/everest 的 install(TARGETS)
+    # 与 install(DIRECTORY include/everest) 是无条件执行的（不受 mbedTLS 的
+    # DISABLE_PACKAGE_CONFIG_AND_INSTALL 约束，那开关只挡住 cmake 配置导出），会往 SDK 包里
+    # 额外塞入 include/mbedtls|psa|everest 头文件与 libmbed{*,x509,crypto}.a / libeverest.* /
+    # libp256m.* 静态库。但 SDK 公共头不引用 mbedTLS，且 mbedTLS 已静态链入
+    # libModelDeploySDK.so（运行时不依赖外置 .a），这些第三方产物对 SDK 使用者无用。
+    # 故在安装末尾统一清除，使发布包只含 SDK 自己的 include/modeldeploy 与库文件。
+    # 说明：不直接改 mbedtls 子模块源码，避免 submodule 改动在 CI 拉取时不可复现。
+    if (BUILD_ENCRYPTION)
+        install(CODE "
+            set(_md_destdir \"\$ENV{DESTDIR}\")
+            set(_md_prefix \"\${_md_destdir}\${CMAKE_INSTALL_PREFIX}\")
+            set(_md_inc \"\${_md_prefix}/include\")
+            set(_md_lib \"\${_md_prefix}/${CMAKE_INSTALL_LIBDIR}\")
+            file(REMOVE_RECURSE
+                \"\${_md_inc}/mbedtls\" \"\${_md_inc}/psa\" \"\${_md_inc}/everest\"
+                \"\${_md_lib}/cmake/MbedTLS\")
+            file(GLOB _md_libs
+                \"\${_md_lib}/libmbed*.a\" \"\${_md_lib}/libmbed*.so\" \"\${_md_lib}/libmbed*.so.*\"
+                \"\${_md_lib}/libeverest.*\" \"\${_md_lib}/libp256m.*\")
+            if (_md_libs)
+                file(REMOVE \${_md_libs})
+            endif ()
+        ")
+    endif ()
 endif ()
 
